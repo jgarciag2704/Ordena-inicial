@@ -1,0 +1,1 @@
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS imagen_thumb VARCHAR(255) NULL AFTER precio;
