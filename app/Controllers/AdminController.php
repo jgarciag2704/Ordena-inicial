@@ -246,6 +246,49 @@ final class AdminController extends Controller
         redirect('/admin/menu' . $this->tenantQuery());
     }
 
+    public function updateOptionValue(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $data = [
+            'id' => (int) ($_POST['id'] ?? 0),
+            'nombre' => trim((string) ($_POST['nombre'] ?? '')),
+            'precio_extra' => (float) ($_POST['precio_extra'] ?? 0),
+        ];
+
+        if ($data['id'] <= 0 || $data['nombre'] === '' || $data['precio_extra'] < 0) {
+            $_SESSION['admin_menu_error'] = 'Revisa nombre y precio del extra.';
+            redirect('/admin/menu' . $this->tenantQuery());
+        }
+
+        try {
+            (new AdminMenu($this->app))->updateOptionValue($data);
+            $_SESSION['admin_menu_success'] = 'Extra actualizado.';
+        } catch (\Throwable $exception) {
+            $_SESSION['admin_menu_error'] = $exception->getMessage();
+        }
+
+        redirect('/admin/menu' . $this->tenantQuery());
+    }
+
+    public function deleteOptionValue(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        try {
+            (new AdminMenu($this->app))->deleteOptionValue((int) ($_POST['id'] ?? 0));
+            $_SESSION['admin_menu_success'] = 'Extra eliminado.';
+        } catch (\Throwable $exception) {
+            $_SESSION['admin_menu_error'] = $exception->getMessage();
+        }
+
+        redirect('/admin/menu' . $this->tenantQuery());
+    }
+
     public function branches(): void
     {
         if (!$this->guard()) {

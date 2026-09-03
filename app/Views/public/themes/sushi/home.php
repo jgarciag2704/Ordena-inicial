@@ -9,7 +9,6 @@
     </header>
 
     <section class="hero hero-bg sushi-hero">
-        <div class="tag">Sushi · Asian kitchen</div>
         <h1><?= e($business['hero_titulo'] ?? 'Precision, frescura y sabor.') ?></h1>
         <p><?= e($business['hero_subtitulo'] ?? 'Rollos, bowls y entradas en un menu compacto.') ?></p>
     </section>

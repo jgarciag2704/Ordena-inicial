@@ -105,7 +105,18 @@
                                     <?php if ($option['tipo'] !== 'texto'): ?>
                                         <div class="value-list">
                                             <?php foreach ($option['valores'] as $value): ?>
-                                                <span class="value-chip"><?= e($value['nombre']) ?> <b><?= money($value['precio_extra']) ?></b></span>
+                                                <div class="value-edit">
+                                                    <form method="post" action="/admin/menu/option-values/update<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>">
+                                                        <input type="hidden" name="id" value="<?= (int) $value['id'] ?>">
+                                                        <input name="nombre" required value="<?= e($value['nombre']) ?>">
+                                                        <input name="precio_extra" type="number" min="0" step="0.01" required value="<?= e((string) $value['precio_extra']) ?>">
+                                                        <button class="chip small">Guardar</button>
+                                                    </form>
+                                                    <form method="post" action="/admin/menu/option-values/delete<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>" onsubmit="return confirm('¿Eliminar este extra?')">
+                                                        <input type="hidden" name="id" value="<?= (int) $value['id'] ?>">
+                                                        <button class="danger-button small">Eliminar</button>
+                                                    </form>
+                                                </div>
                                             <?php endforeach; ?>
                                         </div>
                                         <form class="extra-inline" method="post" action="/admin/menu/option-values<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>">

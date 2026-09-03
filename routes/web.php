@@ -25,6 +25,8 @@ $router->post('/admin/menu/products/update', [AdminController::class, 'updatePro
 $router->post('/admin/menu/products/toggle', [AdminController::class, 'toggleProduct']);
 $router->post('/admin/menu/options', [AdminController::class, 'storeOption']);
 $router->post('/admin/menu/option-values', [AdminController::class, 'storeOptionValue']);
+$router->post('/admin/menu/option-values/update', [AdminController::class, 'updateOptionValue']);
+$router->post('/admin/menu/option-values/delete', [AdminController::class, 'deleteOptionValue']);
 $router->get('/admin/branches', [AdminController::class, 'branches']);
 $router->post('/admin/branches', [AdminController::class, 'storeBranch']);
 $router->post('/admin/branches/update', [AdminController::class, 'updateBranch']);

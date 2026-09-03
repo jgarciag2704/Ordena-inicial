@@ -151,17 +151,52 @@ final class AdminMenu extends Model
 
     public function createOptionValue(array $data): void
     {
-        if (!$this->optionBelongsToTenant((int) $data['producto_opcion_id'])) {
+        $optionId = (int) $data['producto_opcion_id'];
+        $name = trim((string) $data['nombre']);
+
+        if (!$this->optionBelongsToTenant($optionId)) {
             throw new \InvalidArgumentException('La opción no pertenece a este negocio.');
+        }
+
+        if ($this->optionValueExists($optionId, $name)) {
+            throw new \InvalidArgumentException('Ese extra ya existe en este grupo. Usa otro nombre o edita el existente.');
         }
 
         $stmt = $this->db()->prepare('INSERT INTO producto_opcion_valores (negocio_id, producto_opcion_id, nombre, precio_extra, orden, activo) VALUES (?, ?, ?, ?, 100, 1)');
         $stmt->execute([
             $this->negocioId(),
-            $data['producto_opcion_id'],
-            $data['nombre'],
+            $optionId,
+            $name,
             $data['precio_extra'],
         ]);
+    }
+
+    public function updateOptionValue(array $data): void
+    {
+        $id = (int) $data['id'];
+        $name = trim((string) $data['nombre']);
+
+        $value = $this->optionValue($id);
+        if (!$value) {
+            throw new \InvalidArgumentException('El extra no pertenece a este negocio.');
+        }
+
+        if ($this->optionValueExists((int) $value['producto_opcion_id'], $name, $id)) {
+            throw new \InvalidArgumentException('Ya existe otro extra con ese nombre en este grupo.');
+        }
+
+        $stmt = $this->db()->prepare('UPDATE producto_opcion_valores SET nombre = ?, precio_extra = ? WHERE id = ? AND negocio_id = ?');
+        $stmt->execute([$name, $data['precio_extra'], $id, $this->negocioId()]);
+    }
+
+    public function deleteOptionValue(int $id): void
+    {
+        if (!$this->optionValue($id)) {
+            throw new \InvalidArgumentException('El extra no pertenece a este negocio.');
+        }
+
+        $stmt = $this->db()->prepare('DELETE FROM producto_opcion_valores WHERE id = ? AND negocio_id = ?');
+        $stmt->execute([$id, $this->negocioId()]);
     }
 
     private function categoryBelongsToTenant(int $categoryId): bool
@@ -183,5 +218,19 @@ final class AdminMenu extends Model
         $stmt = $this->db()->prepare('SELECT COUNT(*) FROM producto_opciones WHERE id = ? AND negocio_id = ?');
         $stmt->execute([$optionId, $this->negocioId()]);
         return (int) $stmt->fetchColumn() > 0;
+    }
+
+    private function optionValueExists(int $optionId, string $name, int $excludeId = 0): bool
+    {
+        $stmt = $this->db()->prepare('SELECT COUNT(*) FROM producto_opcion_valores WHERE negocio_id = ? AND producto_opcion_id = ? AND nombre = ? AND id <> ?');
+        $stmt->execute([$this->negocioId(), $optionId, $name, $excludeId]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    private function optionValue(int $id): ?array
+    {
+        $stmt = $this->db()->prepare('SELECT * FROM producto_opcion_valores WHERE id = ? AND negocio_id = ? LIMIT 1');
+        $stmt->execute([$id, $this->negocioId()]);
+        return $stmt->fetch() ?: null;
     }
 }
