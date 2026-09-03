@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Personalización · <?= e($business['nombre']) ?></title>
-    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(BASE_PATH . '/public/assets/styles.css') ?>">
     <?php require BASE_PATH . '/app/Views/admin/partials/theme.php'; ?>
 </head>
 <body class="admin-themed store-bg-<?= e($business['fondo_estilo'] ?? 'calido') ?>">
@@ -84,7 +84,7 @@
             <div class="preview-toolbar">
                 <div>
                     <b>Vista previa real</b>
-                    <small>Refleja el layout público guardado del tema seleccionado.</small>
+                    <small>Así verán la tienda tus clientes después de guardar.</small>
                 </div>
                 <a class="chip" href="/<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>" target="_blank">Abrir</a>
             </div>
