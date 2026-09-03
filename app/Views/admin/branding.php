@@ -80,22 +80,22 @@
             <button class="primary" style="width:100%">Guardar personalización</button>
         </form>
 
-        <aside class="brand-preview" id="brandPreview" style="--preview-primary:<?= e($business['color_primario'] ?? '#cc4b25') ?>;--preview-secondary:<?= e($business['color_secundario'] ?? '#2b201b') ?>;--preview-bg:<?= e($business['color_fondo'] ?? '#fffaf4') ?>;--preview-text:<?= e($business['color_texto'] ?? '#171514') ?>;--preview-overlay:<?= e($business['hero_overlay_color'] ?? '#000000') ?>;--preview-overlay-opacity:<?= e((string) ($business['hero_overlay_opacity'] ?? '0.35')) ?>;--preview-blur:<?= (int) ($business['hero_blur'] ?? 0) ?>px;--preview-image:<?= !empty($business['hero_image_url']) ? "url('" . e($business['hero_image_url']) . "')" : 'none' ?>;font-family:<?= e($business['fuente'] ?? 'Inter, system-ui, sans-serif') ?>">
-            <div class="preview-phone <?= e($business['fondo_estilo'] ?? 'calido') ?>">
-                <div class="preview-top"><span>Pedido directo</span><b><?= e($business['nombre']) ?></b></div>
-                <div class="preview-hero">
-                    <span>Abierto ahora · 25-35 min</span>
-                    <h2 id="previewTitle"><?= e($business['hero_titulo'] ?? 'Tu antojo, directo del restaurante.') ?></h2>
-                    <p id="previewSubtitle"><?= e($business['hero_subtitulo'] ?? 'Arma tu pedido como te gusta. Sin intermediarios y con atención directa.') ?></p>
+        <aside class="brand-preview real-store-preview">
+            <div class="preview-toolbar">
+                <div>
+                    <b>Vista previa real</b>
+                    <small>Refleja el layout público guardado del tema seleccionado.</small>
                 </div>
-                <div class="preview-card"><div></div><b>Hamburguesa especial</b><small>Con queso, salsa de casa y papas</small><button>Agregar</button></div>
+                <a class="chip" href="/<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>" target="_blank">Abrir</a>
             </div>
+            <iframe src="/<?= isset($_GET['tenant']) ? '?tenant=' . urlencode((string) $_GET['tenant']) : '' ?>" title="Vista previa de tienda"></iframe>
         </aside>
     </section>
 </main>
 <script>
 const preview = document.querySelector('#brandPreview');
 document.querySelectorAll('[data-preview]').forEach(input => input.addEventListener('input', () => {
+    if (!preview) return;
     const key = input.dataset.preview;
     if (key === 'primary') preview.style.setProperty('--preview-primary', input.value);
     if (key === 'secondary') preview.style.setProperty('--preview-secondary', input.value);
