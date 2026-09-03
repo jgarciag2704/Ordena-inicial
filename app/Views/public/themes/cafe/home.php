@@ -19,7 +19,10 @@
     </section>
 
     <section class="section cafe-menu-block">
-        <div class="section-head"><h2>Menu</h2><div class="branches-public" id="branches"></div></div>
+        <div class="cafe-menu-head">
+            <h2>Menu</h2>
+            <div class="branches-public" id="branches"></div>
+        </div>
         <div class="chips" id="categories">
             <button class="chip active" data-category="all">Destacados</button>
             <?php foreach ($categories as $category): ?>
