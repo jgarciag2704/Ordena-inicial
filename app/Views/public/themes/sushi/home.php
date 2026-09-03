@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head><?php require BASE_PATH . '/app/Views/public/shared/head.php'; ?></head>
-<body class="theme theme-sushi <?= !empty($business['hero_image_url']) ? 'has-hero-image' : '' ?> store-bg-oscuro">
+<body class="theme theme-sushi <?= !empty($business['hero_image_url']) ? 'has-hero-image' : '' ?> store-bg-<?= e($business['fondo_estilo'] ?? 'oscuro') ?>">
 <main class="shell sushi-shell">
     <header class="top sushi-top">
         <div class="brand"><?= e($business['nombre']) ?></div>
