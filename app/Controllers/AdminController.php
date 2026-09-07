@@ -15,8 +15,6 @@ use App\Services\TenantResolver;
 
 final class AdminController extends Controller
 {
-    private const STATUSES = ['nuevo', 'confirmado', 'preparacion', 'listo', 'camino', 'entregado', 'cancelado'];
-
     public function loginForm(): void
     {
         if (!$this->resolveTenant()) {
@@ -66,14 +64,17 @@ final class AdminController extends Controller
         }
 
         $orders = (new Order($this->app))->all();
-        $byStatus = array_fill_keys(self::STATUSES, []);
+        $byStatus = array_fill_keys(Order::statuses(), []);
         foreach ($orders as $order) {
+            $order['estado_label'] = Order::statusLabel((string) $order['estado']);
+            $order['siguientes_estados'] = Order::nextStatuses((string) $order['estado'], (string) $order['tipo']);
             $byStatus[$order['estado']][] = $order;
         }
 
         $this->view('admin/dashboard', [
             'business' => $this->app->tenant()->get(),
-            'statuses' => self::STATUSES,
+            'statuses' => Order::statuses(),
+            'statusLabels' => Order::STATUS_LABELS,
             'byStatus' => $byStatus,
         ]);
     }
@@ -492,7 +493,12 @@ final class AdminController extends Controller
             return;
         }
 
-        $this->view('admin/order', ['business' => $this->app->tenant()->get(), 'order' => $order, 'statuses' => self::STATUSES]);
+        $this->view('admin/order', [
+            'business' => $this->app->tenant()->get(),
+            'order' => $order,
+            'statusLabels' => Order::STATUS_LABELS,
+            'nextStatuses' => Order::nextStatuses((string) $order['estado'], (string) $order['tipo']),
+        ]);
     }
 
     public function status(): void
@@ -501,8 +507,15 @@ final class AdminController extends Controller
             return;
         }
 
-        (new Order($this->app))->updateStatus((int) ($_POST['id'] ?? 0), (string) ($_POST['estado'] ?? ''));
-        redirect('/admin/order?id=' . (int) ($_POST['id'] ?? 0) . $this->tenantQuery('&'));
+        $orderId = (int) ($_POST['id'] ?? 0);
+        (new Order($this->app))->updateStatus($orderId, (string) ($_POST['estado'] ?? ''));
+
+        $returnTo = (string) ($_POST['return_to'] ?? '');
+        if (str_starts_with($returnTo, '/admin')) {
+            redirect($returnTo);
+        }
+
+        redirect('/admin/order?id=' . $orderId . $this->tenantQuery('&'));
     }
 
     private function guard(bool $requireChangedPassword = true): bool

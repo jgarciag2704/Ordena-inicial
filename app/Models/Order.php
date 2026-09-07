@@ -8,6 +8,41 @@ use PDO;
 
 final class Order extends Model
 {
+    public const STATUS_LABELS = [
+        'nuevo' => 'Nuevo',
+        'confirmado' => 'Confirmado',
+        'preparacion' => 'En preparación',
+        'listo' => 'Listo',
+        'camino' => 'En camino',
+        'entregado' => 'Entregado',
+        'cancelado' => 'Cancelado',
+    ];
+
+    private const STATUS_FLOW = [
+        'nuevo' => ['confirmado', 'cancelado'],
+        'confirmado' => ['preparacion', 'cancelado'],
+        'preparacion' => ['listo', 'cancelado'],
+        'listo' => ['camino', 'cancelado'],
+        'camino' => ['entregado', 'cancelado'],
+        'entregado' => [],
+        'cancelado' => [],
+    ];
+
+    public static function statuses(): array
+    {
+        return array_keys(self::STATUS_LABELS);
+    }
+
+    public static function statusLabel(string $status): string
+    {
+        return self::STATUS_LABELS[$status] ?? $status;
+    }
+
+    public static function nextStatuses(string $status, ?string $type = null): array
+    {
+        return self::STATUS_FLOW[$status] ?? [];
+    }
+
     public function create(array $checkout, array $cart): array
     {
         $db = $this->db();
@@ -95,8 +130,22 @@ final class Order extends Model
 
     public function updateStatus(int $id, string $status): bool
     {
-        $allowed = ['nuevo', 'confirmado', 'preparacion', 'listo', 'camino', 'entregado', 'cancelado'];
-        if (!in_array($status, $allowed, true)) {
+        if (!array_key_exists($status, self::STATUS_LABELS)) {
+            return false;
+        }
+
+        $current = $this->db()->prepare('SELECT estado, tipo FROM pedidos WHERE id = ? AND negocio_id = ? LIMIT 1');
+        $current->execute([$id, $this->negocioId()]);
+        $order = $current->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            return false;
+        }
+
+        if ($status === $order['estado']) {
+            return true;
+        }
+
+        if (!in_array($status, self::nextStatuses((string) $order['estado'], (string) $order['tipo']), true)) {
             return false;
         }
 
