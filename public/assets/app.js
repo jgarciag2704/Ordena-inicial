@@ -2,7 +2,6 @@ const state = {
   products: window.ORDENA.products || [],
   branches: window.ORDENA.branches || [],
   cart: window.ORDENA.cart || [],
-  business: window.ORDENA.business || {},
   mode: 'pickup',
   branchId: null,
   selected: null,
@@ -55,14 +54,10 @@ function selectBranch(id) {
 }
 
 function selectCheckoutMode(mode) {
-  if (mode === 'mesa') {
-    if (state.business.comer_aqui_url) window.location.href = state.business.comer_aqui_url;
-    return;
-  }
-
   state.mode = mode;
   document.querySelectorAll('#checkoutModes .mode').forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
   document.querySelector('#addressBlock').style.display = mode === 'delivery' ? 'grid' : 'none';
+  document.querySelector('#tableBlock').style.display = mode === 'mesa' ? 'grid' : 'none';
 }
 
 function renderCart(payload) {
@@ -130,35 +125,28 @@ async function removeItem(index) {
 function checkout() {
   if (!state.cart.length) return;
   closeAll();
-  if (state.mode === 'mesa') state.mode = 'pickup';
-
   const branch = state.branches.find(item => Number(item.id) === Number(state.branchId));
-  const dineInUrl = state.business.comer_aqui_url;
   document.querySelector('#checkoutContent').innerHTML = `
     <button class="chip" onclick="closeAll()">Cerrar x</button>
     <h2>Revisa y finaliza tu pedido</h2>
     <p class="muted">Elige cómo quieres recibirlo y desde qué sucursal se preparará.</p>
     <div class="modes checkout-modes" id="checkoutModes">
       <button class="mode ${state.mode === 'pickup' ? 'active' : ''}" data-mode="pickup" onclick="selectCheckoutMode('pickup')" type="button"><strong>Recoger</strong><span>Pasas por tu pedido</span></button>
+      <button class="mode ${state.mode === 'mesa' ? 'active' : ''}" data-mode="mesa" onclick="selectCheckoutMode('mesa')" type="button"><strong>En mesa</strong><span>Consumes aqui</span></button>
       <button class="mode ${state.mode === 'delivery' ? 'active' : ''}" data-mode="delivery" onclick="selectCheckoutMode('delivery')" type="button"><strong>A domicilio</strong><span>Pago contra entrega</span></button>
-      ${dineInUrl ? `<button class="mode" data-mode="mesa" onclick="selectCheckoutMode('mesa')" type="button"><strong>En mesa</strong><span>Te llevamos al link del restaurante</span></button>` : ''}
     </div>
     <h3>Sucursal</h3>
     <div class="branches-public checkout-branches" id="checkoutBranches">${branchCardsHtml()}</div>
     <label>Nombre<input id="name" placeholder="Tu nombre"></label>
     <label>Celular<input id="phone" inputmode="numeric" placeholder="10 dígitos"></label>
     <label id="addressBlock" style="display:${state.mode === 'delivery' ? 'grid' : 'none'}">Dirección y referencias<textarea id="address" placeholder="Calle, número, colonia y referencias"></textarea></label>
+    <label id="tableBlock" style="display:${state.mode === 'mesa' ? 'grid' : 'none'}">Mesa<input id="table" placeholder="Ej. 4"></label>
     <button class="primary" style="width:100%" onclick="sendCode()">Verificar mi número</button>
   `;
   document.querySelector('#checkoutModal').classList.add('open');
 }
 
 async function sendCode() {
-  if (state.mode === 'mesa') {
-    if (state.business.comer_aqui_url) window.location.href = state.business.comer_aqui_url;
-    return;
-  }
-
   if (!state.branchId) return alert('Selecciona una sucursal abierta para continuar.');
   const response = await post('/checkout/start', {
     mode: state.mode,
@@ -166,7 +154,7 @@ async function sendCode() {
     name: document.querySelector('#name').value,
     phone: document.querySelector('#phone').value,
     address: document.querySelector('#address')?.value || '',
-    table: '',
+    table: document.querySelector('#table')?.value || '',
   });
   if (response.error) return alert(response.error);
 

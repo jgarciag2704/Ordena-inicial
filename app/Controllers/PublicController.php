@@ -77,15 +77,6 @@ final class PublicController extends Controller
         $phone = preg_replace('/\D+/', '', (string) ($input['phone'] ?? ''));
         $address = trim((string) ($input['address'] ?? ''));
         $table = trim((string) ($input['table'] ?? ''));
-        $business = $this->app->tenant()->get();
-
-        if ($mode === 'mesa') {
-            $this->json([
-                'error' => empty($business['comer_aqui_url']) ? 'La opción para comer aquí no está disponible.' : 'Usa el link para comer aquí.',
-                'redirect_url' => $business['comer_aqui_url'] ?? null,
-            ], 422);
-            return;
-        }
 
         if ($name === '' || strlen($phone) !== 10) {
             $this->json(['error' => 'Ingresa nombre y celular de 10 dígitos.'], 422);
