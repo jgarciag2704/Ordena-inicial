@@ -1,1 +1,9 @@
 .env
+public/uploads/*
+!public/uploads/.gitkeep
+!public/uploads/branding/
+public/uploads/branding/*
+!public/uploads/branding/.gitkeep
+!public/uploads/products/
+public/uploads/products/*
+!public/uploads/products/.gitkeep
