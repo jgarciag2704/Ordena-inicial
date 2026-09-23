@@ -23,6 +23,11 @@
             <p><?= e($order['cliente_nombre']) ?> · <?= e($order['cliente_telefono']) ?> · <?= e($order['tipo']) ?></p>
         </div>
         <div class="order-total-card">
+            <?php if ((float) ($order['costo_envio_snapshot'] ?? 0) > 0): ?>
+                <span>Subtotal</span>
+                <b><?= money($order['total'] - $order['costo_envio_snapshot']) ?></b>
+                <span style="font-size:0.85rem;opacity:0.8;">Envío <?= money($order['costo_envio_snapshot']) ?></span>
+            <?php endif; ?>
             <span>Total</span>
             <b><?= money($order['total']) ?></b>
         </div>
@@ -54,13 +59,27 @@
                     <b><?= money($detail['total']) ?></b>
                 </div>
             <?php endforeach; ?>
+            <?php if ((float) ($order['costo_envio_snapshot'] ?? 0) > 0): ?>
+                <div class="order-total-row"><span>Subtotal</span><b><?= money($order['total'] - $order['costo_envio_snapshot']) ?></b></div>
+                <div class="order-total-row"><span>Envío</span><b><?= money($order['costo_envio_snapshot']) ?></b></div>
+            <?php endif; ?>
             <div class="order-total-row"><b>Total</b><b><?= money($order['total']) ?></b></div>
         </section>
         <section class="card order-actions-card">
             <div class="card-title"><span>Cliente y entrega</span></div>
             <div class="info-list">
                 <p><span>Pago</span><b><?= e($order['forma_pago']) ?></b></p>
-                <?php if ($order['direccion_entrega']): ?><p><span>Dirección</span><b><?= e($order['direccion_entrega']) ?></b></p><?php endif; ?>
+                <?php if ($order['tipo'] === 'delivery'): ?>
+                    <?php if ($order['zona_entrega_nombre_snapshot']): ?><p><span>Zona</span><b><?= e($order['zona_entrega_nombre_snapshot']) ?> (<?= money($order['costo_envio_snapshot']) ?>)</b></p><?php endif; ?>
+                    <?php if ($order['distancia_entrega_km']): ?><p><span>Distancia</span><b><?= number_format((float) $order['distancia_entrega_km'], 2) ?> km</b></p><?php endif; ?>
+                    <?php if ($order['direccion_calle']): ?><p><span>Calle y número</span><b><?= e($order['direccion_calle']) ?> <?= e($order['direccion_numero']) ?></b></p><?php endif; ?>
+                    <?php if ($order['direccion_colonia']): ?><p><span>Colonia</span><b><?= e($order['direccion_colonia']) ?></b></p><?php endif; ?>
+                    <?php if ($order['direccion_referencias']): ?><p><span>Referencias</span><b><?= e($order['direccion_referencias']) ?></b></p><?php endif; ?>
+                    <?php if ($order['direccion_entrega']): ?><p><span>Dirección completa</span><b><?= e($order['direccion_entrega']) ?></b></p><?php endif; ?>
+                    <?php if ($order['direccion_latitud'] && $order['direccion_longitud']): ?><p><span>Coordenadas</span><b><?= number_format((float) $order['direccion_latitud'], 6) ?>, <?= number_format((float) $order['direccion_longitud'], 6) ?></b></p><?php endif; ?>
+                    <?php if ($order['efectivo_con']): ?><p><span>Pagará con</span><b><?= money($order['efectivo_con']) ?></b></p><?php endif; ?>
+                    <?php if ($order['cambio_estimado'] > 0): ?><p><span>Cambio estimado</span><b><?= money($order['cambio_estimado']) ?></b></p><?php endif; ?>
+                <?php endif; ?>
                 <?php if ($order['mesa']): ?><p><span>Mesa</span><b><?= e($order['mesa']) ?></b></p><?php endif; ?>
             </div>
             <div class="status-flow">

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AdminController;
+use App\Controllers\CustomerController;
 use App\Controllers\PublicController;
 use App\Controllers\SuperAdminController;
 
@@ -11,6 +12,18 @@ $router->post('/cart/add', [PublicController::class, 'addCart']);
 $router->post('/cart/remove', [PublicController::class, 'removeCart']);
 $router->post('/checkout/start', [PublicController::class, 'startCheckout']);
 $router->post('/checkout/confirm', [PublicController::class, 'confirmCheckout']);
+$router->get('/checkout/geocode', [PublicController::class, 'geocode']);
+$router->get('/checkout/reverse-geocode', [PublicController::class, 'reverseGeocode']);
+$router->post('/checkout/delivery-calculate', [PublicController::class, 'calculateDelivery']);
+
+$router->get('/auth/me', [CustomerController::class, 'me']);
+$router->post('/auth/register', [CustomerController::class, 'register']);
+$router->post('/auth/verify', [CustomerController::class, 'verify']);
+$router->post('/auth/resend', [CustomerController::class, 'resend']);
+$router->post('/auth/login', [CustomerController::class, 'login']);
+$router->post('/auth/logout', [CustomerController::class, 'logout']);
+$router->get('/mis-pedidos', [CustomerController::class, 'orders']);
+$router->get('/mis-pedidos/ver', [CustomerController::class, 'orderByFolio']);
 
 $router->get('/admin', [AdminController::class, 'dashboard']);
 $router->get('/admin/login', [AdminController::class, 'loginForm']);
@@ -33,6 +46,10 @@ $router->post('/admin/branches/update', [AdminController::class, 'updateBranch']
 $router->post('/admin/branches/toggle', [AdminController::class, 'toggleBranch']);
 $router->get('/admin/hours', [AdminController::class, 'hours']);
 $router->post('/admin/hours', [AdminController::class, 'updateHours']);
+$router->get('/admin/delivery-zones', [AdminController::class, 'deliveryZones']);
+$router->post('/admin/delivery-zones', [AdminController::class, 'storeDeliveryZone']);
+$router->post('/admin/delivery-zones/update', [AdminController::class, 'updateDeliveryZone']);
+$router->post('/admin/delivery-zones/toggle', [AdminController::class, 'toggleDeliveryZone']);
 $router->get('/admin/branding', [AdminController::class, 'branding']);
 $router->post('/admin/branding', [AdminController::class, 'updateBranding']);
 $router->get('/admin/order', [AdminController::class, 'order']);

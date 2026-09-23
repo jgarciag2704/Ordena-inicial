@@ -30,6 +30,7 @@
 <?php require BASE_PATH . '/app/Views/public/shared/cart-drawer.php'; ?>
 <?php require BASE_PATH . '/app/Views/public/shared/product-modal.php'; ?>
 <?php require BASE_PATH . '/app/Views/public/shared/checkout-modal.php'; ?>
+<?php require BASE_PATH . '/app/Views/public/shared/account-ui.php'; ?>
 <?php require BASE_PATH . '/app/Views/public/shared/runtime.php'; ?>
 </body>
 </html>

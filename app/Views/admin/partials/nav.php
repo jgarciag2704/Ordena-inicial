@@ -6,6 +6,7 @@
         <a class="nav-link" href="/admin/menu<?= $tenantQuery ?>">Menú</a>
         <a class="nav-link" href="/admin/branches<?= $tenantQuery ?>">Sucursales</a>
         <a class="nav-link" href="/admin/hours<?= $tenantQuery ?>">Horarios</a>
+        <a class="nav-link" href="/admin/delivery-zones<?= $tenantQuery ?>">Zonas</a>
         <a class="nav-link" href="/admin/branding<?= $tenantQuery ?>">Personalización</a>
     </div>
     <form method="post" action="/admin/logout<?= $tenantQuery ?>">

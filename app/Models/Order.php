@@ -50,20 +50,43 @@ final class Order extends Model
 
         try {
             $branchId = (int) $checkout['branch_id'];
-            $customerId = (new Customer($this->app))->findOrCreate($checkout['name'], $checkout['phone']);
+            $customerId = !empty($checkout['cliente_id'])
+                ? (int) $checkout['cliente_id']
+                : (new Customer($this->app))->findOrCreate($checkout['name'], $checkout['phone']);
             $folio = $this->nextFolio();
-            $total = array_reduce($cart, fn (float $sum, array $item): float => $sum + (float) $item['total'], 0.0);
+            $subtotal = array_reduce($cart, fn (float $sum, array $item): float => $sum + (float) $item['total'], 0.0);
+            $isDelivery = $checkout['mode'] === 'delivery';
+            $deliveryFee = $isDelivery ? (float) ($checkout['delivery_fee'] ?? 0) : 0.0;
+            $total = (float) ($checkout['total'] ?? ($subtotal + $deliveryFee));
 
-            $stmt = $db->prepare('INSERT INTO pedidos (negocio_id, sucursal_id, cliente_id, folio, tipo, estado, forma_pago, direccion_entrega, mesa, total) VALUES (?, ?, ?, ?, ?, "nuevo", ?, ?, ?, ?)');
+            $addressParts = $isDelivery ? $this->buildAddress($checkout) : null;
+            $zoneSnapshot = $checkout['zone_snapshot'] ?? null;
+
+            $stmt = $db->prepare('INSERT INTO pedidos (negocio_id, sucursal_id, cliente_id, folio, tipo, estado, forma_pago, direccion_entrega, direccion_calle, direccion_numero, direccion_colonia, direccion_referencias, direccion_latitud, direccion_longitud, distancia_entrega_km, zona_entrega_id, zona_entrega_nombre_snapshot, costo_envio_snapshot, pedido_minimo_snapshot, sucursal_latitud_snapshot, sucursal_longitud_snapshot, mesa, efectivo_con, cambio_estimado, total) VALUES (?, ?, ?, ?, ?, "nuevo", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([
                 $this->negocioId(),
                 $branchId,
                 $customerId,
                 $folio,
                 $checkout['mode'],
-                $checkout['mode'] === 'delivery' ? 'efectivo_entrega' : 'pago_sucursal',
-                $checkout['address'] ?: null,
+                $isDelivery ? 'efectivo_entrega' : 'pago_sucursal',
+                $addressParts ? $addressParts['full'] : ($checkout['address'] ?: null),
+                $addressParts ? $addressParts['calle'] : null,
+                $addressParts ? $addressParts['numero'] : null,
+                $addressParts ? $addressParts['colonia'] : null,
+                $addressParts ? $addressParts['referencias'] : null,
+                $isDelivery && !empty($checkout['delivery_lat']) ? (float) $checkout['delivery_lat'] : null,
+                $isDelivery && !empty($checkout['delivery_lon']) ? (float) $checkout['delivery_lon'] : null,
+                $isDelivery && !empty($checkout['distance_km']) ? (float) $checkout['distance_km'] : null,
+                $isDelivery ? ($checkout['zone_id'] ?: null) : null,
+                $zoneSnapshot ? $zoneSnapshot['nombre'] : null,
+                $deliveryFee,
+                $isDelivery && isset($checkout['min_order']) && $checkout['min_order'] > 0 ? (float) $checkout['min_order'] : null,
+                $isDelivery && !empty($checkout['branch_lat']) ? (float) $checkout['branch_lat'] : null,
+                $isDelivery && !empty($checkout['branch_lon']) ? (float) $checkout['branch_lon'] : null,
                 $checkout['table'] ?: null,
+                $isDelivery ? ($checkout['cash_amount'] ?: null) : null,
+                $isDelivery ? ($checkout['change_amount'] ?? 0.0) : null,
                 $total,
             ]);
             $orderId = (int) $db->lastInsertId();
@@ -95,11 +118,42 @@ final class Order extends Model
         }
     }
 
+    private function buildAddress(array $checkout): array
+    {
+        $parts = [
+            'calle' => $checkout['calle'] ?? '',
+            'numero' => $checkout['numero'] ?? '',
+            'colonia' => $checkout['colonia'] ?? '',
+            'referencias' => $checkout['referencias'] ?? '',
+        ];
+
+        $full = trim($parts['calle'] . ' ' . $parts['numero'] . ', ' . $parts['colonia'], ', ');
+        if ($parts['referencias'] !== '') {
+            $full .= ' (' . $parts['referencias'] . ')';
+        }
+
+        return array_merge($parts, ['full' => $full]);
+    }
+
     public function all(): array
     {
         $stmt = $this->db()->prepare('SELECT p.*, c.nombre cliente_nombre, c.telefono cliente_telefono FROM pedidos p JOIN clientes c ON c.id = p.cliente_id AND c.negocio_id = p.negocio_id WHERE p.negocio_id = ? ORDER BY p.created_at DESC');
         $stmt->execute([$this->negocioId()]);
         return $stmt->fetchAll();
+    }
+
+    public function forCustomer(int $customerId): array
+    {
+        $stmt = $this->db()->prepare('SELECT p.* FROM pedidos p WHERE p.negocio_id = ? AND p.cliente_id = ? ORDER BY p.created_at DESC');
+        $stmt->execute([$this->negocioId(), $customerId]);
+        return $stmt->fetchAll();
+    }
+
+    public function findForCustomerByFolio(int $customerId, string $folio): ?array
+    {
+        $stmt = $this->db()->prepare('SELECT * FROM pedidos WHERE negocio_id = ? AND cliente_id = ? AND folio = ? LIMIT 1');
+        $stmt->execute([$this->negocioId(), $customerId, $folio]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function findWithDetails(int $id): ?array

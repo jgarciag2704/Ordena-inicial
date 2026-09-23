@@ -8,9 +8,9 @@ ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), activo = 1;
 
 SET @negocio_id := (SELECT id FROM negocios WHERE slug = 'laburgueria');
 
-INSERT INTO sucursales (negocio_id, nombre, direccion, telefono, activa)
-VALUES (@negocio_id, 'Sucursal Centro', 'Av. Principal 123, Centro', '5555555555', 1)
-ON DUPLICATE KEY UPDATE direccion = VALUES(direccion), telefono = VALUES(telefono), activa = 1;
+INSERT INTO sucursales (negocio_id, nombre, direccion, telefono, latitud, longitud, activa)
+VALUES (@negocio_id, 'Sucursal Centro', 'Av. Principal 123, Centro', '5555555555', 19.43260000, -99.13320000, 1)
+ON DUPLICATE KEY UPDATE direccion = VALUES(direccion), telefono = VALUES(telefono), latitud = VALUES(latitud), longitud = VALUES(longitud), activa = 1;
 
 INSERT INTO usuarios (negocio_id, nombre, email, password_hash, debe_cambiar_password, rol, activo)
 VALUES (@negocio_id, 'Administrador', 'admin@laburgueria.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCk7Vj8S0/2/HpMIgoi', 0, 'admin', 1)
@@ -37,9 +37,11 @@ INSERT INTO productos (negocio_id, categoria_id, nombre, descripcion, precio, di
 (@negocio_id, @bebidas, 'Malteada de fresa', 'Cremosa y preparada al momento.', 75, 1, 20)
 ON DUPLICATE KEY UPDATE categoria_id = VALUES(categoria_id), descripcion = VALUES(descripcion), precio = VALUES(precio), disponible = 1, orden = VALUES(orden);
 
-INSERT INTO zonas_entrega (negocio_id, nombre, costo, pedido_minimo, activa)
-VALUES (@negocio_id, 'Zona cercana', 35, 120, 1)
-ON DUPLICATE KEY UPDATE costo = VALUES(costo), pedido_minimo = VALUES(pedido_minimo), activa = 1;
+SET @sucursal_id := (SELECT id FROM sucursales WHERE negocio_id = @negocio_id ORDER BY id LIMIT 1);
+
+INSERT INTO zonas_entrega (negocio_id, sucursal_id, nombre, costo_envio, pedido_minimo, activa)
+VALUES (@negocio_id, @sucursal_id, 'Zona cercana', 35, 120, 1)
+ON DUPLICATE KEY UPDATE sucursal_id = VALUES(sucursal_id), costo_envio = VALUES(costo_envio), pedido_minimo = VALUES(pedido_minimo), activa = 1;
 
 INSERT INTO producto_opciones (negocio_id, producto_id, nombre, tipo, requerida, orden, activo)
 SELECT @negocio_id, p.id, 'Extras', 'multiple', 0, 10, 1 FROM productos p WHERE p.negocio_id = @negocio_id

@@ -208,6 +208,57 @@ docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQ
 6. OTP simulado: `123456`.
 7. Crear pedido real en estado `nuevo` con folio por negocio, por ejemplo `LB-1001`.
 
+## Delivery con mapa y zonas por distancia
+
+El checkout de delivery ahora puede calcular automáticamente la zona y el costo de envío según la distancia entre la sucursal y la ubicación del cliente.
+
+### Configuración
+
+1. Configura la ubicación de cada sucursal en `/admin/branches?tenant=laburgueria`:
+   - Buscá una dirección o arrastrá el pin en el mapa.
+   - Guardá latitud y longitud.
+   - Sin coordenadas, la sucursal no podrá recibir pedidos delivery.
+
+2. Creá zonas de entrega en `/admin/delivery-zones?tenant=laburgueria`:
+   - **Manual**: el cliente selecciona una zona de una lista.
+   - **Por distancia (radio)**: definí rangos como 0–2 km, 2–4 km, etc. El sistema asigna la tarifa automáticamente.
+   - Los rangos por radio no pueden traslaparse.
+   - El último rango puede dejarse sin límite superior (`Hasta` vacío) para cubrir “más de X km”.
+
+### Checkout delivery
+
+- El cliente elige delivery, selecciona una sucursal con ubicación y busca su dirección en el mapa.
+- Puede mover el pin para ajustar la ubicación exacta.
+- El sistema muestra distancia, zona asignada, envío y total.
+- Si el destino queda fuera de cobertura o no alcanza el pedido mínimo, no permite continuar.
+
+### Mapas y geocodificación
+
+- Los mapas usan **Leaflet** con capas de **OpenStreetMap**. La atribución `© OpenStreetMap contributors` debe permanecer visible.
+- La búsqueda de direcciones usa **Nominatim** (servicio gratuito de OpenStreetMap).
+- Configurá el `User-Agent` en `.env` con tu dominio y correo de soporte real:
+
+```env
+GEOCODING_USER_AGENT=TuApp/1.0 (soporte@tudominio.com)
+```
+
+- El checkout usa **búsqueda manual** (botón o `Enter`), nunca autocompletado por tecla. Esto respeta el límite de 1 solicitud por segundo de Nominatim.
+- Las búsquedas exitosas se cachean en Redis durante 30 días; las búsquedas sin resultados se cachean 10 minutos.
+- Si Redis no está disponible, el servicio usa un fallback a archivos locales.
+- Nominatim tiene límites de uso: máximo 1 petición por segundo en su instancia pública. Si necesitás más volumen, podés:
+  - Alojar tu propia instancia de Nominatim.
+  - Reemplazar `App\Services\GeocodingService` por Google Maps, Mapbox u otro proveedor sin modificar el resto de la app. El acceso a geocodificación está encapsulado en ese servicio.
+
+### Migraciones para delivery con mapa
+
+Si tu base ya existía, aplicá estas migraciones en orden:
+
+```bash
+docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/branch-location.sql
+docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/delivery-zones-radio.sql
+docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/delivery-order-snapshots.sql
+```
+
 ## Multitenancy
 
 El tenant se resuelve desde `HTTP_HOST` para subdominios `*.ordena.garciacore.com` y `*.ordena.localhost`. En local también se acepta `?tenant=slug`.

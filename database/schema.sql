@@ -58,7 +58,10 @@ CREATE TABLE sucursales (
   negocio_id BIGINT UNSIGNED NOT NULL,
   nombre VARCHAR(120) NOT NULL,
   direccion VARCHAR(255) NOT NULL,
+  direccion_referencia VARCHAR(255) NULL,
   telefono VARCHAR(20) NULL,
+  latitud DECIMAL(10,8) NULL,
+  longitud DECIMAL(11,8) NULL,
   activa TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY sucursales_negocio_nombre_unique (negocio_id, nombre),
@@ -157,7 +160,22 @@ CREATE TABLE pedidos (
   estado ENUM('nuevo','confirmado','preparacion','listo','camino','entregado','cancelado') NOT NULL DEFAULT 'nuevo',
   forma_pago ENUM('pago_sucursal','efectivo_entrega') NOT NULL,
   direccion_entrega TEXT NULL,
+  direccion_calle VARCHAR(120) NULL,
+  direccion_numero VARCHAR(40) NULL,
+  direccion_colonia VARCHAR(120) NULL,
+  direccion_referencias TEXT NULL,
+  direccion_latitud DECIMAL(10,8) NULL,
+  direccion_longitud DECIMAL(11,8) NULL,
+  distancia_entrega_km DECIMAL(6,2) NULL,
+  zona_entrega_id BIGINT UNSIGNED NULL,
+  zona_entrega_nombre_snapshot VARCHAR(120) NULL,
+  costo_envio_snapshot DECIMAL(10,2) NOT NULL DEFAULT 0,
+  pedido_minimo_snapshot DECIMAL(10,2) NULL,
+  sucursal_latitud_snapshot DECIMAL(10,8) NULL,
+  sucursal_longitud_snapshot DECIMAL(11,8) NULL,
   mesa VARCHAR(30) NULL,
+  efectivo_con DECIMAL(10,2) NULL,
+  cambio_estimado DECIMAL(10,2) NULL,
   total DECIMAL(10,2) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -165,7 +183,8 @@ CREATE TABLE pedidos (
   INDEX pedidos_negocio_estado_idx (negocio_id, estado),
   CONSTRAINT pedidos_negocio_fk FOREIGN KEY (negocio_id) REFERENCES negocios(id),
   CONSTRAINT pedidos_sucursal_fk FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-  CONSTRAINT pedidos_cliente_fk FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+  CONSTRAINT pedidos_cliente_fk FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+  CONSTRAINT pedidos_zona_entrega_fk FOREIGN KEY (zona_entrega_id) REFERENCES zonas_entrega(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE pedido_detalles (
@@ -198,12 +217,21 @@ CREATE TABLE pedido_detalle_opciones (
 CREATE TABLE zonas_entrega (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   negocio_id BIGINT UNSIGNED NOT NULL,
+  sucursal_id BIGINT UNSIGNED NOT NULL,
   nombre VARCHAR(120) NOT NULL,
-  costo DECIMAL(10,2) NOT NULL DEFAULT 0,
-  pedido_minimo DECIMAL(10,2) NOT NULL DEFAULT 0,
+  tipo_zona ENUM('manual','radio') NOT NULL DEFAULT 'manual',
+  radio_desde_km DECIMAL(6,2) NULL,
+  radio_hasta_km DECIMAL(6,2) NULL,
+  costo_envio DECIMAL(10,2) NOT NULL DEFAULT 0,
+  pedido_minimo DECIMAL(10,2) NULL,
   activa TINYINT(1) NOT NULL DEFAULT 1,
-  UNIQUE KEY zonas_entrega_negocio_nombre_unique (negocio_id, nombre),
-  CONSTRAINT zonas_entrega_negocio_fk FOREIGN KEY (negocio_id) REFERENCES negocios(id)
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY zonas_entrega_sucursal_nombre_unique (sucursal_id, nombre),
+  INDEX zonas_entrega_negocio_idx (negocio_id),
+  INDEX zonas_entrega_sucursal_idx (sucursal_id),
+  CONSTRAINT zonas_entrega_negocio_fk FOREIGN KEY (negocio_id) REFERENCES negocios(id),
+  CONSTRAINT zonas_entrega_sucursal_fk FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE negocio_horarios (

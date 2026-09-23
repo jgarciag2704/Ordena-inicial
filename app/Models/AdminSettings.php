@@ -22,8 +22,17 @@ final class AdminSettings extends Model
 
     public function updateBranch(array $data): void
     {
-        $stmt = $this->db()->prepare('UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE id = ? AND negocio_id = ?');
-        $stmt->execute([$data['nombre'], $data['direccion'], $data['telefono'] ?: null, $data['id'], $this->negocioId()]);
+        $stmt = $this->db()->prepare('UPDATE sucursales SET nombre = ?, direccion = ?, direccion_referencia = ?, telefono = ?, latitud = ?, longitud = ? WHERE id = ? AND negocio_id = ?');
+        $stmt->execute([
+            $data['nombre'],
+            $data['direccion'],
+            $data['direccion_referencia'] ?: null,
+            $data['telefono'] ?: null,
+            $data['latitud'] !== null ? (float) $data['latitud'] : null,
+            $data['longitud'] !== null ? (float) $data['longitud'] : null,
+            $data['id'],
+            $this->negocioId(),
+        ]);
     }
 
     public function toggleBranch(int $id): void

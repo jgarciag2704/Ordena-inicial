@@ -10,7 +10,7 @@ final class Branch extends Model
     {
         $day = (int) date('N');
         $time = date('H:i:s');
-        $stmt = $this->db()->prepare('SELECT s.id, s.nombre, s.direccion, s.telefono, h.abre, h.cierra, h.cerrado,
+        $stmt = $this->db()->prepare('SELECT s.id, s.nombre, s.direccion, s.direccion_referencia, s.telefono, s.latitud, s.longitud, h.abre, h.cierra, h.cerrado,
             CASE WHEN h.cerrado = 0 AND h.abre IS NOT NULL AND h.cierra IS NOT NULL AND ? BETWEEN h.abre AND h.cierra THEN 1 ELSE 0 END abierta
             FROM sucursales s
             LEFT JOIN sucursal_horarios h ON h.sucursal_id = s.id AND h.negocio_id = s.negocio_id AND h.dia_semana = ?
@@ -18,6 +18,13 @@ final class Branch extends Model
             ORDER BY abierta DESC, s.nombre');
         $stmt->execute([$time, $day, $this->negocioId()]);
         return $stmt->fetchAll();
+    }
+
+    public function find(int $id): ?array
+    {
+        $stmt = $this->db()->prepare('SELECT * FROM sucursales WHERE id = ? AND negocio_id = ? LIMIT 1');
+        $stmt->execute([$id, $this->negocioId()]);
+        return $stmt->fetch() ?: null;
     }
 
     public function isOpen(int $id): bool
@@ -29,5 +36,11 @@ final class Branch extends Model
             WHERE s.id = ? AND s.negocio_id = ? AND s.activa = 1 AND h.cerrado = 0 AND ? BETWEEN h.abre AND h.cierra');
         $stmt->execute([$day, $id, $this->negocioId(), $time]);
         return (int) $stmt->fetchColumn() > 0;
+    }
+
+    public function hasLocation(int $id): bool
+    {
+        $branch = $this->find($id);
+        return $branch !== null && $branch['latitud'] !== null && $branch['longitud'] !== null;
     }
 }

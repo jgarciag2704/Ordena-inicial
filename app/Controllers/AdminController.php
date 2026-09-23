@@ -9,6 +9,7 @@ use App\Models\AdminMenu;
 use App\Models\AdminSettings;
 use App\Models\Branding;
 use App\Models\User;
+use App\Models\DeliveryZone;
 use App\Services\ImageService;
 use App\Services\ThemeResolver;
 use App\Services\TenantResolver;
@@ -300,6 +301,7 @@ final class AdminController extends Controller
         $this->view('admin/branches', [
             'business' => $this->app->tenant()->get(),
             'branches' => $settings->branches(),
+            'mapEnabled' => true,
             'error' => $_SESSION['admin_settings_error'] ?? null,
             'success' => $_SESSION['admin_settings_success'] ?? null,
         ]);
@@ -393,6 +395,103 @@ final class AdminController extends Controller
 
         $separator = isset($_GET['tenant']) ? '&' : '?';
         redirect('/admin/hours' . $this->tenantQuery() . $separator . 'branch_id=' . $branchId);
+    }
+
+    public function deliveryZones(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $settings = new AdminSettings($this->app);
+        $branches = $settings->branches();
+        $branchId = (int) ($_GET['branch_id'] ?? 0) ?: ($settings->defaultBranchId() ?? 0);
+
+        if ($branchId && !$settings->branchBelongsToTenant($branchId)) {
+            $branchId = $settings->defaultBranchId() ?? 0;
+        }
+
+        $selectedBranch = null;
+        foreach ($branches as $b) {
+            if ((int) $b['id'] === $branchId) {
+                $selectedBranch = $b;
+                break;
+            }
+        }
+
+        $this->view('admin/delivery-zones', [
+            'business' => $this->app->tenant()->get(),
+            'branches' => $branches,
+            'branchId' => $branchId,
+            'selectedBranch' => $selectedBranch,
+            'zones' => $branchId ? (new DeliveryZone($this->app))->allForBranch($branchId) : [],
+            'mapEnabled' => true,
+            'success' => $_SESSION['admin_zones_success'] ?? null,
+            'error' => $_SESSION['admin_zones_error'] ?? null,
+        ]);
+        unset($_SESSION['admin_zones_success'], $_SESSION['admin_zones_error']);
+    }
+
+    public function storeDeliveryZone(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $data = $this->deliveryZoneData();
+        if ($data['nombre'] === '' || $data['sucursal_id'] <= 0 || $data['costo_envio'] < 0) {
+            $_SESSION['admin_zones_error'] = 'Escribe nombre, selecciona sucursal y indica un costo de envío válido.';
+            redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+        }
+
+        try {
+            (new DeliveryZone($this->app))->create($data);
+            $_SESSION['admin_zones_success'] = 'Zona de entrega creada.';
+        } catch (\Throwable $exception) {
+            $_SESSION['admin_zones_error'] = $exception->getMessage();
+        }
+
+        redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+    }
+
+    public function updateDeliveryZone(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $data = $this->deliveryZoneData();
+        $data['id'] = (int) ($_POST['id'] ?? 0);
+        if ($data['id'] <= 0 || $data['nombre'] === '' || $data['sucursal_id'] <= 0 || $data['costo_envio'] < 0) {
+            $_SESSION['admin_zones_error'] = 'Revisa nombre, sucursal y costo de envío.';
+            redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+        }
+
+        try {
+            (new DeliveryZone($this->app))->update($data);
+            $_SESSION['admin_zones_success'] = 'Zona de entrega actualizada.';
+        } catch (\Throwable $exception) {
+            $_SESSION['admin_zones_error'] = $exception->getMessage();
+        }
+
+        redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+    }
+
+    public function toggleDeliveryZone(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $branchId = (int) ($_POST['sucursal_id'] ?? 0);
+        try {
+            (new DeliveryZone($this->app))->toggle((int) ($_POST['id'] ?? 0));
+            $_SESSION['admin_zones_success'] = 'Disponibilidad de zona actualizada.';
+        } catch (\Throwable $exception) {
+            $_SESSION['admin_zones_error'] = $exception->getMessage();
+        }
+
+        redirect('/admin/delivery-zones' . $this->branchQuery($branchId));
     }
 
     public function branding(): void
@@ -584,7 +683,33 @@ final class AdminController extends Controller
         return [
             'nombre' => trim((string) ($_POST['nombre'] ?? '')),
             'direccion' => trim((string) ($_POST['direccion'] ?? '')),
+            'direccion_referencia' => trim((string) ($_POST['direccion_referencia'] ?? '')),
             'telefono' => trim((string) ($_POST['telefono'] ?? '')),
+            'latitud' => ($_POST['latitud'] ?? '') === '' ? null : (float) $_POST['latitud'],
+            'longitud' => ($_POST['longitud'] ?? '') === '' ? null : (float) $_POST['longitud'],
         ];
+    }
+
+    private function deliveryZoneData(): array
+    {
+        $type = (string) ($_POST['tipo_zona'] ?? 'manual');
+        return [
+            'sucursal_id' => (int) ($_POST['sucursal_id'] ?? 0),
+            'nombre' => trim((string) ($_POST['nombre'] ?? '')),
+            'tipo_zona' => in_array($type, ['manual', 'radio'], true) ? $type : 'manual',
+            'radio_desde_km' => ($_POST['radio_desde_km'] ?? '') === '' ? null : (float) $_POST['radio_desde_km'],
+            'radio_hasta_km' => ($_POST['radio_hasta_km'] ?? '') === '' ? null : (float) $_POST['radio_hasta_km'],
+            'costo_envio' => (float) ($_POST['costo_envio'] ?? 0),
+            'pedido_minimo' => ($_POST['pedido_minimo'] ?? '') === '' ? null : (float) $_POST['pedido_minimo'],
+        ];
+    }
+
+    private function branchQuery(int $branchId): string
+    {
+        $query = $this->tenantQuery();
+        if ($branchId > 0) {
+            $query .= (isset($_GET['tenant']) ? '&' : '?') . 'branch_id=' . $branchId;
+        }
+        return $query;
     }
 }
