@@ -120,12 +120,12 @@ final class RedisService
         try {
             $count = 1;
             if (is_file($path)) {
-                $data = json_decode((string) file_get_contents($path), true);
+                $data = json_decode((string) @file_get_contents($path), true);
                 if (is_array($data) && ($data['expires_at'] ?? 0) > time()) {
                     $count = (int) ($data['value'] ?? 0) + 1;
                 }
             }
-            file_put_contents($path, $this->encode(['expires_at' => time() + $ttlSeconds, 'value' => $count]), LOCK_EX);
+            @file_put_contents($path, $this->encode(['expires_at' => time() + $ttlSeconds, 'value' => $count]), LOCK_EX);
         } finally {
             $this->fileUnlock($key . '_count');
         }
@@ -158,7 +158,7 @@ final class RedisService
             return null;
         }
 
-        $data = json_decode(file_get_contents($path) ?: '{}', true);
+        $data = json_decode(@file_get_contents($path) ?: '{}', true);
         if (!is_array($data) || ($data['expires_at'] ?? 0) < time()) {
             @unlink($path);
             return null;
@@ -171,17 +171,17 @@ final class RedisService
     {
         $path = $this->filePath($key);
         $data = ['expires_at' => time() + $ttlSeconds, 'value' => $value];
-        return file_put_contents($path, $this->encode($data), LOCK_EX) !== false;
+        return @file_put_contents($path, $this->encode($data), LOCK_EX) !== false;
     }
 
     private function fileLock(string $key, int $ttlSeconds): bool
     {
         $path = $this->filePath($key . '_lock');
-        if (is_file($path) && filemtime($path) + $ttlSeconds > time()) {
+        if (is_file($path) && @filemtime($path) + $ttlSeconds > time()) {
             return false;
         }
         @unlink($path);
-        return file_put_contents($path, (string) time(), LOCK_EX) !== false;
+        return @file_put_contents($path, (string) time(), LOCK_EX) !== false;
     }
 
     private function fileUnlock(string $key): void
