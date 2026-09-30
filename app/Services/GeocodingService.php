@@ -14,6 +14,14 @@ final class GeocodingService
     private const RATE_LIMIT_LOCK_TTL = 5;
     private const RATE_LIMIT_KEY = 'geocoding:last_request';
 
+    private const COUNTRY_ALPHA3 = [
+        'MX' => 'MEX', 'US' => 'USA', 'CA' => 'CAN', 'GT' => 'GTM', 'BZ' => 'BLZ', 'SV' => 'SLV',
+        'HN' => 'HND', 'NI' => 'NIC', 'CR' => 'CRI', 'PA' => 'PAN', 'CU' => 'CUB', 'DO' => 'DOM',
+        'HT' => 'HTI', 'JM' => 'JAM', 'TT' => 'TTO', 'CO' => 'COL', 'VE' => 'VEN', 'EC' => 'ECU',
+        'PE' => 'PER', 'BO' => 'BOL', 'PY' => 'PRY', 'BR' => 'BRA', 'UY' => 'URY', 'CL' => 'CHL',
+        'AR' => 'ARG', 'ES' => 'ESP', 'FR' => 'FRA', 'IT' => 'ITA', 'DE' => 'DEU', 'GB' => 'GBR', 'PT' => 'PRT',
+    ];
+
     public function __construct(private readonly App $app)
     {
     }
@@ -29,7 +37,7 @@ final class GeocodingService
             return [];
         }
 
-        $cacheKey = 'geocode:search:' . md5($query);
+        $cacheKey = 'geocode:search:v2:' . md5($this->provider() . '|' . trim((string) $this->app->config('geocoding.country', '')) . '|' . $query);
         $cached = (new RedisService($this->app))->get($cacheKey);
         if ($cached !== null) {
             return $cached['results'];
@@ -60,7 +68,7 @@ final class GeocodingService
      */
     public function reverse(float $lat, float $lon): ?array
     {
-        $cacheKey = 'geocode:reverse:' . md5("{$lat},{$lon}");
+        $cacheKey = 'geocode:reverse:v2:' . md5($this->provider() . '|' . trim((string) $this->app->config('geocoding.country', '')) . '|' . "{$lat},{$lon}");
         $cached = (new RedisService($this->app))->get($cacheKey);
         if ($cached !== null) {
             return $cached['result'];
@@ -125,6 +133,9 @@ final class GeocodingService
             if (!is_array($item)) {
                 continue;
             }
+            if (!$this->countryMatches($item)) {
+                continue;
+            }
             $mapped = $this->mapPositionstackItem($item);
             if ($mapped !== null) {
                 $items[] = $mapped;
@@ -132,6 +143,26 @@ final class GeocodingService
         }
 
         return $items;
+    }
+
+    /**
+     * Positionstack ignora el parámetro "country" en el plan free, así que
+     * descartamos del lado nuestro los resultados de otros países.
+     */
+    private function countryMatches(array $item): bool
+    {
+        $configured = strtoupper(trim((string) $this->app->config('geocoding.country', '')));
+        if ($configured === '') {
+            return true;
+        }
+
+        $alpha3 = self::COUNTRY_ALPHA3[$configured] ?? null;
+        $code = strtoupper((string) ($item['country_code'] ?? ''));
+        if ($alpha3 === null || $code === '') {
+            return true;
+        }
+
+        return $code === $alpha3;
     }
 
     private function positionstackReverse(string $lat, string $lon): ?array
