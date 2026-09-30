@@ -13,10 +13,17 @@ return [
         'password' => env('DB_PASSWORD', ''),
     ],
     'geocoding' => [
-        'user_agent' => env('GEOCODING_USER_AGENT', ''),
         'provider' => env('GEOCODING_PROVIDER', 'nominatim'),
+        'user_agent' => env('GEOCODING_USER_AGENT', ''),
         'base_url' => env('GEOCODING_BASE_URL', 'https://nominatim.openstreetmap.org'),
-        'timeout' => (int) env('GEOCODING_TIMEOUT', '10'),
+        'timeout' => (int) env('GEOCODING_TIMEOUT', '15'),
+        'country' => env('GEOCODING_COUNTRY', ''),
+        'positionstack' => [
+            'endpoint' => env('POSITIONSTACK_ENDPOINT', 'https://api.positionstack.com'),
+            'access_key' => env('POSITIONSTACK_ACCESS_KEY', ''),
+        ],
+        'max_per_hour_ip_search' => (int) env('GEO_MAX_PER_HOUR_IP_SEARCH', '60'),
+        'max_per_hour_ip_reverse' => (int) env('GEO_MAX_PER_HOUR_IP_REVERSE', '120'),
     ],
     'redis' => [
         'host' => env('REDIS_HOST', 'redis'),

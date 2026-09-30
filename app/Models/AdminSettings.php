@@ -15,8 +15,16 @@ final class AdminSettings extends Model
 
     public function createBranch(array $data): void
     {
-        $stmt = $this->db()->prepare('INSERT INTO sucursales (negocio_id, nombre, direccion, telefono, activa) VALUES (?, ?, ?, ?, 1)');
-        $stmt->execute([$this->negocioId(), $data['nombre'], $data['direccion'], $data['telefono'] ?: null]);
+        $stmt = $this->db()->prepare('INSERT INTO sucursales (negocio_id, nombre, direccion, direccion_referencia, telefono, latitud, longitud, activa) VALUES (?, ?, ?, ?, ?, ?, ?, 1)');
+        $stmt->execute([
+            $this->negocioId(),
+            $data['nombre'],
+            $data['direccion'],
+            $data['direccion_referencia'] ?: null,
+            $data['telefono'] ?: null,
+            $data['latitud'] !== null ? (float) $data['latitud'] : null,
+            $data['longitud'] !== null ? (float) $data['longitud'] : null,
+        ]);
         $this->ensureHours((int) $this->db()->lastInsertId());
     }
 

@@ -304,7 +304,13 @@ final class PublicController extends Controller
         }
 
         $query = trim((string) ($_GET['q'] ?? ''));
-        $results = (new GeocodingService($this->app))->search($query);
+
+        try {
+            $results = (new GeocodingService($this->app))->search($query);
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], $e->getCode() ?: 422);
+            return;
+        }
 
         $this->json(['results' => $results]);
     }
@@ -324,7 +330,12 @@ final class PublicController extends Controller
             return;
         }
 
-        $result = (new GeocodingService($this->app))->reverse($lat, $lon);
+        try {
+            $result = (new GeocodingService($this->app))->reverse($lat, $lon);
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], $e->getCode() ?: 422);
+            return;
+        }
         if ($result === null) {
             $this->json(['error' => 'No pudimos identificar la dirección de esa ubicación.'], 404);
             return;

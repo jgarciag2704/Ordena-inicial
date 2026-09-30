@@ -36,20 +36,23 @@ final class GeocodingService
         }
 
         $this->enforceRateLimit();
+        $this->enforceIpLimit('search');
 
-        $url = $this->buildUrl('/search', [
-            'format' => 'json',
-            'limit' => '5',
-            'q' => $query,
-        ]);
+        if ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
+            $results = $this->positionstackSearch($query);
+        } else {
+            if ($this->provider() === 'positionstack') {
+                error_log('[Ordena] ADVERTENCIA: GEOCODING_PROVIDER=positionstack pero falta POSITIONSTACK_ACCESS_KEY. Usando Nominatim mientras tanto.');
+            }
+            $results = array_map([$this, 'mapResult'], $this->nominatimSearch($query));
+        }
 
-        $results = $this->fetch($url);
-        $mapped = array_map([$this, 'mapResult'], $results);
+        $results = array_values(array_filter($results));
 
-        $ttl = empty($mapped) ? self::CACHE_MISS_TTL : self::CACHE_HIT_TTL;
-        (new RedisService($this->app))->set($cacheKey, ['results' => $mapped], $ttl);
+        $ttl = empty($results) ? self::CACHE_MISS_TTL : self::CACHE_HIT_TTL;
+        (new RedisService($this->app))->set($cacheKey, ['results' => $results], $ttl);
 
-        return $mapped;
+        return $results;
     }
 
     /**
@@ -64,20 +67,87 @@ final class GeocodingService
         }
 
         $this->enforceRateLimit();
+        $this->enforceIpLimit('reverse');
 
-        $url = $this->buildUrl('/reverse', [
-            'format' => 'json',
-            'lat' => (string) $lat,
-            'lon' => (string) $lon,
-        ]);
-
-        $data = $this->fetch($url);
-        $result = $this->mapResult($data);
+        if ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
+            $result = $this->positionstackReverse((string) $lat, (string) $lon);
+        } else {
+            if ($this->provider() === 'positionstack') {
+                error_log('[Ordena] ADVERTENCIA: GEOCODING_PROVIDER=positionstack pero falta POSITIONSTACK_ACCESS_KEY. Usando Nominatim mientras tanto.');
+            }
+            $result = $this->mapResult($this->nominatimReverse($lat, $lon));
+        }
 
         $ttl = $result === null ? self::CACHE_MISS_TTL : self::CACHE_HIT_TTL;
         (new RedisService($this->app))->set($cacheKey, ['result' => $result], $ttl);
 
         return $result;
+    }
+
+    private function provider(): string
+    {
+        return (string) $this->app->config('geocoding.provider', 'nominatim');
+    }
+
+    private function nominatimSearch(string $query): array
+    {
+        return $this->fetch($this->buildUrl('/search', [
+            'format' => 'json',
+            'limit' => '5',
+            'q' => $query,
+        ]));
+    }
+
+    private function nominatimReverse(float $lat, float $lon): array
+    {
+        return $this->fetch($this->buildUrl('/reverse', [
+            'format' => 'json',
+            'lat' => (string) $lat,
+            'lon' => (string) $lon,
+        ]));
+    }
+
+    private function positionstackSearch(string $query): array
+    {
+        $params = [
+            'query' => $query,
+            'limit' => '5',
+        ];
+        $country = trim((string) $this->app->config('geocoding.country', ''));
+        if ($country !== '') {
+            $params['country'] = $country;
+        }
+
+        $body = $this->fetch($this->buildPositionstackUrl('/v1/forward', $params));
+
+        $items = [];
+        foreach (($body['data'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $mapped = $this->mapPositionstackItem($item);
+            if ($mapped !== null) {
+                $items[] = $mapped;
+            }
+        }
+
+        return $items;
+    }
+
+    private function positionstackReverse(string $lat, string $lon): ?array
+    {
+        $body = $this->fetch($this->buildPositionstackUrl('/v1/reverse', [
+            'query' => "{$lat},{$lon}",
+            'limit' => '1',
+        ]));
+
+        $item = $body['data'][0] ?? null;
+        return is_array($item) ? $this->mapPositionstackItem($item) : null;
+    }
+
+    private function positionstackKey(): string
+    {
+        return trim((string) $this->app->config('geocoding.positionstack.access_key', ''));
     }
 
     private function buildUrl(string $path, array $params): string
@@ -86,10 +156,16 @@ final class GeocodingService
         return $baseUrl . $path . '?' . http_build_query($params);
     }
 
+    private function buildPositionstackUrl(string $path, array $params): string
+    {
+        $base = rtrim((string) $this->app->config('geocoding.positionstack.endpoint', 'https://api.positionstack.com'), '/');
+        return $base . $path . '?' . http_build_query(array_merge(['access_key' => $this->positionstackKey()], $params));
+    }
+
     private function fetch(string $url): array
     {
         $userAgent = $this->userAgent();
-        $timeout = $this->app->config('geocoding.timeout', 10);
+        $timeout = $this->app->config('geocoding.timeout', 15);
 
         $headers = [
             'Accept-Language: es',
@@ -164,6 +240,35 @@ final class GeocodingService
         ];
     }
 
+    /**
+     * Normaliza un resultado de Positionstack al mismo formato que Nominatim
+     * (display_name, lat, lon, type, address) para no cambiar el frontend.
+     */
+    private function mapPositionstackItem(array $item): ?array
+    {
+        $lat = (float) ($item['latitude'] ?? 0);
+        $lon = (float) ($item['longitude'] ?? 0);
+        if ($lat === 0.0 && $lon === 0.0) {
+            return null;
+        }
+
+        return [
+            'display_name' => (string) ($item['label'] ?? ''),
+            'lat' => $lat,
+            'lon' => $lon,
+            'type' => (string) ($item['type'] ?? ''),
+            'address' => [
+                'road' => (string) ($item['street'] ?? ''),
+                'house_number' => (string) ($item['number'] ?? ''),
+                'neighbourhood' => (string) ($item['neighbourhood'] ?? ''),
+                'locality' => (string) ($item['locality'] ?? ''),
+                'postcode' => (string) ($item['postal_code'] ?? ''),
+                'state' => (string) ($item['region'] ?? ''),
+                'country' => (string) ($item['country'] ?? ''),
+            ],
+        ];
+    }
+
     private function normalizeQuery(string $query): string
     {
         return trim(preg_replace('/\s+/', ' ', $query));
@@ -181,5 +286,32 @@ final class GeocodingService
         }
 
         $redis->setLastRequestTime(self::RATE_LIMIT_KEY, microtime(true), self::RATE_LIMIT_LOCK_TTL);
+    }
+
+    /**
+     * Tope por IP por hora para que un atacante no consuma la cuota del
+     * proveedor de geocoding (importante con Positionstack).
+     */
+    private function enforceIpLimit(string $kind): void
+    {
+        $max = (int) $this->app->config(
+            'geocoding.max_per_hour_ip_' . $kind,
+            $kind === 'reverse' ? 120 : 60
+        );
+        if ($max <= 0) {
+            return;
+        }
+
+        $ip = $this->clientIp();
+        $count = (new RedisService($this->app))->count("geocode:iphour:{$kind}:{$ip}", 3600);
+        if ($count > $max) {
+            throw new \RuntimeException('Demasiadas búsquedas en este momento. Intentá de nuevo en unos minutos.', 429);
+        }
+    }
+
+    private function clientIp(): string
+    {
+        $ip = preg_replace('/[^0-9a-fA-F:.]+/', '', (string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        return $ip !== '' ? strtolower($ip) : '0';
     }
 }
