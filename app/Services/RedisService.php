@@ -33,8 +33,8 @@ final class RedisService
 
         try {
             $redis = new \Redis();
-            $redis->connect($host, $port, 1.0);
-            $redis->ping();
+            @$redis->connect($host, $port, 1.0);
+            @$redis->ping();
             $this->redis = $redis;
             $this->redisAvailable = true;
         } catch (\Throwable $e) {
@@ -145,7 +145,7 @@ final class RedisService
 
     private function filePath(string $key): string
     {
-        if (!is_dir($this->fileCachePath) && !mkdir($this->fileCachePath, 0770, true) && !is_dir($this->fileCachePath)) {
+        if (!is_dir($this->fileCachePath) && !@mkdir($this->fileCachePath, 0770, true) && !is_dir($this->fileCachePath)) {
             throw new \RuntimeException('No se pudo crear el directorio de caché.');
         }
         return $this->fileCachePath . '/' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $key) . '.json';

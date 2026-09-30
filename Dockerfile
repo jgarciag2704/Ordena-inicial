@@ -8,3 +8,4 @@ RUN apk add --no-cache freetype-dev libjpeg-turbo-dev libpng-dev libwebp-dev aut
 COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 WORKDIR /var/www/html
 COPY . /var/www/html
+RUN mkdir -p /var/www/html/storage/cache && chown -R www-data:www-data /var/www/html/storage
