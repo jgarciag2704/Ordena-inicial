@@ -8,7 +8,6 @@
             <div class="tag">Pedido directo</div>
             <div class="brand"><?= e($business['nombre']) ?></div>
         </div>
-        <button class="chip" onclick="openCart()">Carrito <span id="cartCount">0</span></button>
     </header>
 
     <section class="hero hero-bg burger-hero">

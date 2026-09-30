@@ -96,6 +96,42 @@ final class RedisService
         $this->set($key, ['time' => $time], $ttlSeconds);
     }
 
+    /**
+     * Incrementa un contador con expiración. Devuelve el valor tras incrementar.
+     * Se usa para límites de peticiones (rate limiting).
+     */
+    public function count(string $key, int $ttlSeconds): int
+    {
+        if ($this->redisAvailable) {
+            $count = $this->redis->incr($key);
+            if ($count === 1) {
+                $this->redis->expire($key, $ttlSeconds);
+            }
+            return (int) $count;
+        }
+
+        return $this->fileCount($key, $ttlSeconds);
+    }
+
+    private function fileCount(string $key, int $ttlSeconds): int
+    {
+        $path = $this->filePath($key . '_count');
+        $this->fileLock($key . '_count', $ttlSeconds);
+        try {
+            $count = 1;
+            if (is_file($path)) {
+                $data = json_decode((string) file_get_contents($path), true);
+                if (is_array($data) && ($data['expires_at'] ?? 0) > time()) {
+                    $count = (int) ($data['value'] ?? 0) + 1;
+                }
+            }
+            file_put_contents($path, $this->encode(['expires_at' => time() + $ttlSeconds, 'value' => $count]), LOCK_EX);
+        } finally {
+            $this->fileUnlock($key . '_count');
+        }
+        return $count;
+    }
+
     private function decode(string $value): ?array
     {
         $decoded = json_decode($value, true);

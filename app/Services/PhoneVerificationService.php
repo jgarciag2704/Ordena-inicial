@@ -38,6 +38,11 @@ final class PhoneVerificationService
             return ['ok' => false, 'error' => "Esperá {$cooldown} segundos antes de pedir otro código."];
         }
 
+        $limitError = $this->enforceLimits($redis, $negocioId, $phone);
+        if ($limitError !== null) {
+            return ['ok' => false, 'error' => $limitError];
+        }
+
         $code = (string) random_int(100000, 999999);
         $ttlMinutes = (int) $this->app->config('otp.ttl_minutes', 10);
         $expira = date('Y-m-d H:i:s', time() + $ttlMinutes * 60);
@@ -47,7 +52,8 @@ final class PhoneVerificationService
         $stmt->execute([$negocioId, $phone, $code, $expira]);
 
         $sms = new SmsService($this->app);
-        $sms->send($phone, 'Tu código de verificación para ' . $this->app->tenant()->get()['nombre'] . ' es: ' . $code . '. No lo compartas.');
+        $negocioNombre = (string) ($this->app->tenant()->get()['nombre'] ?? '');
+        $sms->send($phone, 'Tu código de verificación para ' . $negocioNombre . ' es: ' . $code . '. No lo compartas.', $negocioNombre);
 
         $redis->set($cooldownKey, ['time' => time()], (int) $this->app->config('otp.resend_cooldown_seconds', 60));
 
@@ -109,5 +115,60 @@ final class PhoneVerificationService
     public function normalizeDigits(string $phone): string
     {
         return preg_replace('/\D+/', '', $phone);
+    }
+
+    /**
+     * Topes de envío de OTP para evitar abuso (quema de SMS):
+     * por teléfono (hora y día), por IP (hora) y global por negocio (minuto).
+     * Devuelve un mensaje de error si se excede, o null si la solicitud procede.
+     */
+    private function enforceLimits(RedisService $redis, int $negocioId, string $phone): ?string
+    {
+        $ip = $this->clientIp();
+        $checks = [
+            [
+                "otp:phonehour:{$negocioId}:{$phone}",
+                3600,
+                'otp.max_per_hour_phone',
+                3,
+                'Llegaste al límite de códigos por hora para este teléfono. Esperá y volvé a intentar.',
+            ],
+            [
+                "otp:phoneday:{$negocioId}:{$phone}",
+                86400,
+                'otp.max_per_day_phone',
+                6,
+                'Llegaste al límite de códigos del día para este teléfono. Intentá más tarde.',
+            ],
+            [
+                "otp:iphour:{$negocioId}:{$ip}",
+                3600,
+                'otp.max_per_hour_ip',
+                10,
+                'Hubo demasiados envíos de código desde tu red. Esperá un rato y volvé a intentar.',
+            ],
+            [
+                "otp:minute:{$negocioId}",
+                60,
+                'otp.max_per_minute_business',
+                20,
+                'Hay demasiadas solicitudes ahora mismo. Esperá unos segundos y volvé a intentar.',
+            ],
+        ];
+
+        foreach ($checks as [$key, $ttl, $configKey, $default, $message]) {
+            $max = (int) $this->app->config($configKey, $default);
+            if ($max > 0 && $redis->count($key, $ttl) > $max) {
+                return $message;
+            }
+        }
+
+        return null;
+    }
+
+    private function clientIp(): string
+    {
+        $ip = preg_replace('/[^0-9a-fA-F:.]+/', '', (string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        return $ip !== '' ? strtolower($ip) : '0';
     }
 }

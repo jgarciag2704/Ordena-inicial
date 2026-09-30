@@ -5,7 +5,6 @@
 <main class="shell sushi-shell">
     <header class="top sushi-top">
         <div class="brand"><?= e($business['nombre']) ?></div>
-        <button class="chip" onclick="openCart()">Carrito <span id="cartCount">0</span></button>
     </header>
 
     <section class="hero hero-bg sushi-hero">

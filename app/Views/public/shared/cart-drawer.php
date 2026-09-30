@@ -1,5 +1,3 @@
-<button class="cart" onclick="openCart()">Ver carrito · <span id="cartTotal">$0</span></button>
-
 <div class="drawer" id="drawer">
     <aside class="panel">
         <button class="chip" onclick="closeAll()">Cerrar x</button>

@@ -462,8 +462,8 @@ function haversine(lat1, lon1, lat2, lon2) {
 function renderCart(payload) {
   if (payload) state.cart = payload.items;
   const total = subtotal();
-  document.querySelector('#cartCount').textContent = state.cart.length;
-  document.querySelector('#cartTotal').textContent = money(total);
+  document.querySelectorAll('#cartCount').forEach(el => el.textContent = state.cart.length);
+  document.querySelectorAll('#cartTotal').forEach(el => el.textContent = money(total));
   document.querySelector('#totalAside').textContent = money(total);
   document.querySelector('#cartItems').innerHTML = state.cart.length ? state.cart.map((item, index) => `
     <div class="row">
@@ -672,6 +672,8 @@ function goToMyOrders() {
 /* ===================== Cuenta de cliente ===================== */
 
 function openAccount() {
+  const menu = document.querySelector('#accountMenu');
+  if (menu) menu.style.display = 'none';
   const modal = document.querySelector('#accountModal');
   if (!modal) return;
   renderAccount('login');
@@ -919,7 +921,12 @@ async function showOrderDetail(folio) {
   `;
 }
 
-function openCart() { document.querySelector('#drawer').classList.add('open'); renderCart(); }
+function openCart() {
+  const menu = document.querySelector('#accountMenu');
+  if (menu) menu.style.display = 'none';
+  document.querySelector('#drawer').classList.add('open');
+  renderCart();
+}
 function closeAll() { document.querySelectorAll('.drawer,.modal').forEach(element => element.classList.remove('open')); }
 
 async function post(path, payload) {

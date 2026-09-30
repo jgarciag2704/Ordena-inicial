@@ -5,7 +5,6 @@
 <main class="shell mexicana-shell">
     <header class="top mexicana-top">
         <div><div class="tag">Comida casera</div><div class="brand"><?= e($business['nombre']) ?></div></div>
-        <button class="chip" onclick="openCart()">Carrito <span id="cartCount">0</span></button>
     </header>
 
     <section class="hero hero-bg mexicana-hero">

@@ -131,32 +131,6 @@
         margin: -2px auto 0;
     }
 
-    .account-fab {
-        position: fixed;
-        left: 20px;
-        bottom: 20px;
-        background: var(--dark, #2b201b);
-        color: #fff;
-        box-shadow: 0 12px 30px rgba(0,0,0,0.2);
-        border-radius: 999px;
-        padding: 12px 18px;
-        font-weight: 800;
-        z-index: 4;
-    }
-    .account-menu {
-        position: fixed;
-        left: 20px;
-        bottom: 78px;
-        display: none;
-        gap: 6px;
-        background: #fff;
-        border: 1px solid #e8e0d8;
-        border-radius: 14px;
-        padding: 8px;
-        box-shadow: 0 14px 34px rgba(0,0,0,0.16);
-        z-index: 4;
-        min-width: 160px;
-    }
     .account-menu button {
         width: 100%;
         text-align: left;
@@ -222,7 +196,5 @@
         .delivery-search-input-wrap { flex-direction: column; }
         .delivery-search-input-wrap button { width: 100%; justify-content: center; }
         #deliveryMap { height: 260px; }
-        .account-fab { left: 12px; bottom: 12px; padding: 10px 14px; font-size: 0.85rem; }
-        .account-menu { left: 12px; bottom: 66px; }
     }
 </style>

@@ -5,7 +5,6 @@
 <main class="shell premium-shell">
     <header class="top premium-top">
         <div class="brand"><?= e($business['nombre']) ?></div>
-        <nav><button class="chip" onclick="openCart()">Pedido <span id="cartCount">0</span></button></nav>
     </header>
 
     <section class="hero hero-bg premium-hero">
