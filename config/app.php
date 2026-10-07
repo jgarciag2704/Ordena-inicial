@@ -18,6 +18,19 @@ return [
         'base_url' => env('GEOCODING_BASE_URL', 'https://nominatim.openstreetmap.org'),
         'timeout' => (int) env('GEOCODING_TIMEOUT', '15'),
         'country' => env('GEOCODING_COUNTRY', ''),
+        // Intervalo mínimo en segundos entre requests, por provider (0 = sin límite).
+        'min_interval_seconds' => [
+            'nominatim' => (int) env('GEOCODING_MIN_INTERVAL_NOMINATIM', '1'),
+            'positionstack' => (int) env('GEOCODING_MIN_INTERVAL_POSITIONSTACK', '1'),
+            'google' => (int) env('GEOCODING_MIN_INTERVAL_GOOGLE', '0'),
+        ],
+        'google' => [
+            'endpoint' => env('GOOGLE_GEOCODING_ENDPOINT', 'https://maps.googleapis.com'),
+            // Solo se usa desde PHP/backend. Nunca exponer en JS/HTML/JSON.
+            'api_key' => env('GOOGLE_GEOCODING_API_KEY', ''),
+            'language' => env('GOOGLE_GEOCODING_LANGUAGE', 'es'),
+            'region' => env('GOOGLE_GEOCODING_REGION', 'mx'),
+        ],
         'positionstack' => [
             'endpoint' => env('POSITIONSTACK_ENDPOINT', 'https://api.positionstack.com'),
             'access_key' => env('POSITIONSTACK_ACCESS_KEY', ''),

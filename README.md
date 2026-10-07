@@ -235,19 +235,49 @@ El checkout de delivery ahora puede calcular automáticamente la zona y el costo
 ### Mapas y geocodificación
 
 - Los mapas usan **Leaflet** con capas de **OpenStreetMap**. La atribución `© OpenStreetMap contributors` debe permanecer visible.
-- La búsqueda de direcciones usa **Nominatim** (servicio gratuito de OpenStreetMap).
-- Configurá el `User-Agent` en `.env` con tu dominio y correo de soporte real:
+- La búsqueda de direcciones usa el proveedor configurado en `GEOCODING_PROVIDER`: **`google`** (Google Geocoding API), **`nominatim`** (OSM) o **`positionstack`**. Ver la sección [Google Geocoding](#google-geocoding).
+- Si usás Nominatim, configurá el `User-Agent` en `.env` con tu dominio y correo de soporte real:
 
 ```env
 GEOCODING_USER_AGENT=TuApp/1.0 (soporte@tudominio.com)
 ```
 
-- El checkout usa **búsqueda manual** (botón o `Enter`), nunca autocompletado por tecla. Esto respeta el límite de 1 solicitud por segundo de Nominatim.
+- El checkout usa **búsqueda manual** (botón o `Enter`), nunca autocompletado por tecla. Con Nominatim esto respeta el límite de 1 solicitud por segundo (con Google ese límite artificial está desactivado).
 - Las búsquedas exitosas se cachean en Redis durante 30 días; las búsquedas sin resultados se cachean 10 minutos.
 - Si Redis no está disponible, el servicio usa un fallback a archivos locales.
 - Nominatim tiene límites de uso: máximo 1 petición por segundo en su instancia pública. Si necesitás más volumen, podés:
+  - Cambiar `GEOCODING_PROVIDER=google` (recomendado para producción).
   - Alojar tu propia instancia de Nominatim.
-  - Reemplazar `App\Services\GeocodingService` por Google Maps, Mapbox u otro proveedor sin modificar el resto de la app. El acceso a geocodificación está encapsulado en ese servicio.
+  - Usar Positionstack. El acceso a geocodificación está encapsulado en `App\Services\GeocodingService`, así que el resto de la app no cambia al cambiar de proveedor.
+
+### Google Geocoding
+
+Google se usa **únicamente para geocodificación** (convertir dirección ↔ latitud/longitud), del lado del servidor.
+
+**Qué debe estar habilitado en Google Cloud Console:**
+
+1. Cuenta de facturación activa (Google da 10,000 requests/mes gratis de Geocoding).
+2. Proyecto con la **Geocoding API** habilitada (`APIs & Services → Enable APIs`).
+3. Una **API key restringida a uso server-side** (por IP de tu servidor o por aplicación → solo IP). Esa key va solo en `.env`, nunca en el navegador.
+
+**Variables `.env`:**
+
+```env
+GEOCODING_PROVIDER=google
+GOOGLE_GEOCODING_API_KEY=tu_api_key_server_side
+GOOGLE_GEOCODING_LANGUAGE=es
+GOOGLE_GEOCODING_REGION=mx
+GEOCODING_COUNTRY=MX
+```
+
+- `GOOGLE_GEOCODING_API_KEY` **solo se lee desde PHP**: no aparece en JavaScript, HTML, logs ni en las respuestas JSON de `/checkout/geocode` o `/checkout/reverse-geocode`.
+- Para volver a otro proveedor, cambiá `GEOCODING_PROVIDER` a `nominatim` o `positionstack`. No hay fallback automático: se usa el proveedor configurado.
+- El límite artificial de 1 request/segundo aplica solo a Nominatim (`GEOCODING_MIN_INTERVAL_NOMINATIM=1`); para Google es `0`.
+- Los límites anti-abuso por IP (`GEO_MAX_PER_HOUR_IP_*`) y la caché de Redis se mantienen para todos los proveedores.
+
+**Qué NO hace falta habilitar** (no se usan y generan costo): Maps JavaScript API, Places API / Autocomplete, Routes API, Distance Matrix, Address Validation, Street View, Maps Embed.
+
+**Qué no cambia:** Leaflet + OpenStreetMap siguen siendo los mapas del proyecto, Haversine (`DistanceCalculator`) sigue calculando las distancias y las zonas de entrega (`DeliveryCalculator`, `zonas_entrega`) no cambian.
 
 ### Migraciones para delivery con mapa
 

@@ -10,9 +10,16 @@ final class GeocodingService
 {
     private const CACHE_HIT_TTL = 30 * 24 * 60 * 60; // 30 días
     private const CACHE_MISS_TTL = 10 * 60; // 10 minutos
-    private const RATE_LIMIT_SECONDS = 1;
     private const RATE_LIMIT_LOCK_TTL = 5;
     private const RATE_LIMIT_KEY = 'geocoding:last_request';
+
+    // Intervalo mínimo (segundos) entre requests, por provider.
+    // 1s: exigencia de la instancia pública de Nominatim. 0: sin límite artificial.
+    private const MIN_INTERVAL_DEFAULTS = [
+        'nominatim' => 1,
+        'positionstack' => 1,
+        'google' => 0,
+    ];
 
     private const COUNTRY_ALPHA3 = [
         'MX' => 'MEX', 'US' => 'USA', 'CA' => 'CAN', 'GT' => 'GTM', 'BZ' => 'BLZ', 'SV' => 'SLV',
@@ -46,7 +53,9 @@ final class GeocodingService
         $this->enforceRateLimit();
         $this->enforceIpLimit('search');
 
-        if ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
+        if ($this->provider() === 'google') {
+            $results = $this->googleSearch($query);
+        } elseif ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
             $results = $this->positionstackSearch($query);
         } else {
             if ($this->provider() === 'positionstack') {
@@ -77,7 +86,9 @@ final class GeocodingService
         $this->enforceRateLimit();
         $this->enforceIpLimit('reverse');
 
-        if ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
+        if ($this->provider() === 'google') {
+            $result = $this->googleReverse($lat, $lon);
+        } elseif ($this->provider() === 'positionstack' && $this->positionstackKey() !== '') {
             $result = $this->positionstackReverse((string) $lat, (string) $lon);
         } else {
             if ($this->provider() === 'positionstack') {
@@ -179,6 +190,248 @@ final class GeocodingService
     private function positionstackKey(): string
     {
         return trim((string) $this->app->config('geocoding.positionstack.access_key', ''));
+    }
+
+    /**
+     * Google Geocoding API (REST). Uso exclusivo server-side: la API key
+     * viaja solo en esta petición PHP y nunca se expone en JavaScript,
+     * HTML, logs ni respuestas JSON.
+     */
+    private function googleSearch(string $query): array
+    {
+        $params = ['address' => $query] + $this->googleLanguageParams();
+
+        $country = strtoupper(trim((string) $this->app->config('geocoding.country', '')));
+        if ($country !== '') {
+            $params['components'] = 'country:' . strtolower($country);
+        }
+
+        $results = $this->googleResults($this->googleFetch('/maps/api/geocode/json', $params));
+
+        $mapped = [];
+        foreach (array_slice($results, 0, 5) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $result = $this->mapGoogleResult($item);
+            if ($result !== null && $this->googleCountryMatches($result)) {
+                $mapped[] = $result;
+            }
+        }
+
+        return $mapped;
+    }
+
+    private function googleReverse(float $lat, float $lon): ?array
+    {
+        // components=country no está permitido junto a latlng, así que el
+        // filtro de país se aplica sobre los resultados devueltos.
+        $params = ['latlng' => "{$lat},{$lon}"] + $this->googleLanguageParams();
+
+        $results = $this->googleResults($this->googleFetch('/maps/api/geocode/json', $params));
+
+        foreach ($results as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $result = $this->mapGoogleResult($item);
+            if ($result !== null && $this->googleCountryMatches($result)) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    private function googleFetch(string $path, array $params): array
+    {
+        $apiKey = $this->googleApiKey();
+        if ($apiKey === '') {
+            error_log('[Ordena] ERROR: GEOCODING_PROVIDER=google pero GOOGLE_GEOCODING_API_KEY está vacía. Configúrala en .env (uso server-side).');
+            throw new \RuntimeException('La búsqueda de direcciones no está disponible en este momento. Intenta de nuevo en unos minutos.', 503);
+        }
+
+        $params['key'] = $apiKey;
+
+        try {
+            return $this->fetch($this->buildGoogleUrl($path, $params));
+        } catch (\RuntimeException $e) {
+            // Solo se registra el código HTTP: nunca la URL (contiene la key).
+            error_log('[Ordena] Google Geocoding: falló la petición (código HTTP ' . (int) $e->getCode() . ').');
+            throw $e;
+        }
+    }
+
+    private function buildGoogleUrl(string $path, array $params): string
+    {
+        $base = rtrim((string) $this->app->config('geocoding.google.endpoint', 'https://maps.googleapis.com'), '/');
+
+        return $base . $path . '?' . http_build_query($params);
+    }
+
+    private function googleApiKey(): string
+    {
+        return trim((string) $this->app->config('geocoding.google.api_key', ''));
+    }
+
+    private function googleLanguageParams(): array
+    {
+        $params = [];
+
+        $language = trim((string) $this->app->config('geocoding.google.language', 'es'));
+        if ($language !== '') {
+            $params['language'] = $language;
+        }
+
+        $region = trim((string) $this->app->config('geocoding.google.region', ''));
+        if ($region !== '') {
+            $params['region'] = $region;
+        }
+
+        return $params;
+    }
+
+    /**
+     * Convierte el campo "status" de Google en los mismos errores controlados
+     * que ya maneja el servicio. No expone detalles internos al usuario.
+     */
+    private function googleResults(array $body): array
+    {
+        $status = strtoupper((string) preg_replace('/[^A-Za-z_]/', '', (string) ($body['status'] ?? '')));
+
+        if ($status === 'OK') {
+            $results = $body['results'] ?? [];
+
+            return is_array($results) ? $results : [];
+        }
+
+        if ($status === 'ZERO_RESULTS') {
+            return [];
+        }
+
+        if ($status === 'OVER_QUERY_LIMIT') {
+            error_log('[Ordena] Google Geocoding: OVER_QUERY_LIMIT (cuota o rate limit alcanzado).');
+
+            throw new \RuntimeException('La búsqueda está tardando un momento. Intenta nuevamente en unos segundos.', 429);
+        }
+
+        if ($status === 'REQUEST_DENIED') {
+            error_log('[Ordena] Google Geocoding: REQUEST_DENIED (revisar GOOGLE_GEOCODING_API_KEY, facturación y restricciones de la key).');
+
+            throw new \RuntimeException('La búsqueda de direcciones no está disponible en este momento. Intenta de nuevo en unos minutos.', 503);
+        }
+
+        if ($status === 'INVALID_REQUEST') {
+            error_log('[Ordena] Google Geocoding: INVALID_REQUEST (consulta mal formada).');
+
+            throw new \RuntimeException('No se pudo completar la búsqueda. Revisa la dirección e intenta de nuevo.', 422);
+        }
+
+        error_log('[Ordena] Google Geocoding: respuesta inesperada del proveedor' . ($status !== '' ? ' (status=' . $status . ')' : '') . '.');
+
+        throw new \RuntimeException('La búsqueda está tardando un momento. Intenta nuevamente en unos segundos.', 503);
+    }
+
+    /**
+     * Normaliza un resultado de Google al mismo formato que Nominatim
+     * (display_name, lat, lon, type, address) para no cambiar el frontend.
+     */
+    private function mapGoogleResult(array $item): ?array
+    {
+        $location = $item['geometry']['location'] ?? null;
+        if (!is_array($location) || !isset($location['lat'], $location['lng'])) {
+            return null;
+        }
+
+        $components = [];
+        foreach (($item['address_components'] ?? []) as $component) {
+            if (!is_array($component)) {
+                continue;
+            }
+            foreach ((array) ($component['types'] ?? []) as $type) {
+                $components[(string) $type] = [
+                    'long' => (string) ($component['long_name'] ?? ''),
+                    'short' => (string) ($component['short_name'] ?? ''),
+                ];
+            }
+        }
+
+        $type = '';
+        foreach ((array) ($item['types'] ?? []) as $candidate) {
+            if (is_string($candidate) && $candidate !== '') {
+                $type = $candidate;
+                break;
+            }
+        }
+
+        return [
+            'display_name' => (string) ($item['formatted_address'] ?? ''),
+            'lat' => (float) $location['lat'],
+            'lon' => (float) $location['lng'],
+            'type' => $type,
+            'address' => $this->googleAddressComponents($components),
+        ];
+    }
+
+    /**
+     * Mapea los address_components de Google a las claves que ya consume
+     * el frontend (road, house_number, neighbourhood, suburb, ...).
+     */
+    private function googleAddressComponents(array $components): array
+    {
+        $long = static fn (string $key): string => $components[$key]['long'] ?? '';
+        $short = static fn (string $key): string => $components[$key]['short'] ?? '';
+
+        $locality = $long('locality');
+        if ($locality === '') {
+            $locality = $long('postal_town');
+        }
+        if ($locality === '') {
+            $locality = $long('town') !== '' ? $long('town') : $long('village');
+        }
+
+        $sublocality = $long('sublocality') !== '' ? $long('sublocality') : $long('sublocality_level_1');
+
+        $neighbourhood = $long('neighborhood');
+        if ($neighbourhood === '') {
+            $neighbourhood = $sublocality;
+        }
+
+        $address = [
+            'road' => $long('route'),
+            'house_number' => $long('street_number'),
+            'neighbourhood' => $neighbourhood,
+            'suburb' => $sublocality,
+            'locality' => $locality,
+            'postcode' => $long('postal_code'),
+            'state' => $long('administrative_area_level_1'),
+            'county' => $long('administrative_area_level_2'),
+            'country' => $long('country'),
+            'country_code' => strtolower($short('country')),
+            'hamlet' => $long('hamlet'),
+        ];
+
+        return array_filter($address, static fn (string $value): bool => $value !== '');
+    }
+
+    /**
+     * Filtra por país cuando GEOCODING_COUNTRY está definido (ej. MX).
+     * Si el resultado no trae el componente país, se acepta: en búsquedas
+     * el filtro ya se envía con components=country:XX.
+     */
+    private function googleCountryMatches(array $result): bool
+    {
+        $configured = strtoupper(trim((string) $this->app->config('geocoding.country', '')));
+        if ($configured === '') {
+            return true;
+        }
+
+        $code = strtoupper((string) ($result['address']['country_code'] ?? ''));
+        if ($code === '') {
+            return true;
+        }
+
+        return $code === $configured;
     }
 
     private function buildUrl(string $path, array $params): string
@@ -307,16 +560,33 @@ final class GeocodingService
 
     private function enforceRateLimit(): void
     {
+        $interval = $this->minIntervalSeconds();
+        if ($interval <= 0) {
+            return;
+        }
+
         $redis = new RedisService($this->app);
         $lastRequest = $redis->getLastRequestTime(self::RATE_LIMIT_KEY);
         $now = microtime(true);
 
-        if ($lastRequest !== null && ($now - $lastRequest) < self::RATE_LIMIT_SECONDS) {
-            $wait = (int) ceil((self::RATE_LIMIT_SECONDS - ($now - $lastRequest)) * 1000);
+        if ($lastRequest !== null && ($now - $lastRequest) < $interval) {
+            $wait = (int) ceil(($interval - ($now - $lastRequest)) * 1000);
             usleep($wait * 1000);
         }
 
         $redis->setLastRequestTime(self::RATE_LIMIT_KEY, microtime(true), self::RATE_LIMIT_LOCK_TTL);
+    }
+
+    /**
+     * Intervalo mínimo entre requests para el provider activo.
+     * Configurable vía GEOCODING_MIN_INTERVAL_<PROVIDER>; 0 desactiva el límite.
+     */
+    private function minIntervalSeconds(): int
+    {
+        $provider = $this->provider();
+        $default = self::MIN_INTERVAL_DEFAULTS[$provider] ?? 0;
+
+        return (int) $this->app->config('geocoding.min_interval_seconds.' . $provider, $default);
     }
 
     /**

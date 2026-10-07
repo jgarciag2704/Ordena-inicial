@@ -17,7 +17,7 @@
     }
     body { font-family: <?= e($business['fuente'] ?? 'Inter, system-ui, sans-serif') ?>; }
     /* Búsqueda y mapa de delivery */
-    .delivery-search-box { position: relative; z-index: 10; }
+    .delivery-search-box { position: relative; z-index: 1100; }
     .delivery-search-box > label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.95rem; }
     .delivery-search-input-wrap { display: flex; gap: 8px; }
     .delivery-search-input-wrap input {

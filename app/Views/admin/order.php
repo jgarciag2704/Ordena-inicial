@@ -6,7 +6,31 @@
     <title><?= e($order['folio']) ?> · <?= e($business['nombre']) ?></title>
     <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(BASE_PATH . '/public/assets/styles.css') ?>">
     <link rel="stylesheet" href="/assets/orders.css?v=<?= filemtime(BASE_PATH . '/public/assets/orders.css') ?>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <?php require BASE_PATH . '/app/Views/admin/partials/theme.php'; ?>
+    <style>
+        .order-map-block { margin-top: 16px; }
+        .order-map {
+            height: 240px;
+            border-radius: 16px;
+            border: 1px solid #e3e9f2;
+            overflow: hidden;
+            background: #f1f5f9;
+        }
+        .order-map-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .order-map-actions .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 14px;
+            border: 0;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .order-map-feedback { margin-top: 8px; font-size: 0.82rem; font-weight: 650; color: #0f7180; }
+    </style>
 </head>
 <body class="admin-themed order-admin-page store-bg-<?= e($business['fondo_estilo'] ?? 'calido') ?>">
 <main class="shell">
@@ -82,6 +106,23 @@
                 <?php endif; ?>
                 <?php if ($order['mesa']): ?><p><span>Mesa</span><b><?= e($order['mesa']) ?></b></p><?php endif; ?>
             </div>
+            <?php
+            $destLat = (float) ($order['direccion_latitud'] ?? 0);
+            $destLon = (float) ($order['direccion_longitud'] ?? 0);
+            $hasDestination = $order['tipo'] === 'delivery' && $destLat !== 0.0 && $destLon !== 0.0;
+            ?>
+            <?php if ($hasDestination): ?>
+                <div class="order-map-block">
+                    <div class="order-map" id="orderMap"
+                         data-lat="<?= sprintf('%.6F', $destLat) ?>"
+                         data-lon="<?= sprintf('%.6F', $destLon) ?>"></div>
+                    <div class="order-map-actions">
+                        <a class="chip" href="https://www.google.com/maps?q=<?= sprintf('%.6F', $destLat) ?>,<?= sprintf('%.6F', $destLon) ?>&z=16" target="_blank" rel="noopener">Abrir en Google Maps</a>
+                        <button type="button" class="chip" onclick="copyDeliveryLocation()">Copiar ubicación</button>
+                    </div>
+                    <p class="order-map-feedback" id="copyLocationMsg" style="display:none;"></p>
+                </div>
+            <?php endif; ?>
             <div class="status-flow">
                 <p><span>Estado actual</span><b class="status-current"><?= e($statusLabels[$order['estado']] ?? $order['estado']) ?></b></p>
                 <?php if ($nextStatuses): ?>
@@ -100,5 +141,50 @@
         </section>
     </div>
 </main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+    const mapEl = document.getElementById('orderMap');
+    if (!mapEl || typeof L === 'undefined') return;
+    const lat = parseFloat(mapEl.dataset.lat);
+    const lon = parseFloat(mapEl.dataset.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    const map = L.map(mapEl).setView([lat, lon], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    L.marker([lat, lon]).addTo(map).bindPopup('Destino de entrega').openPopup();
+    setTimeout(() => map.invalidateSize(), 250);
+})();
+
+function copyDeliveryLocation() {
+    const mapEl = document.getElementById('orderMap');
+    const msg = document.getElementById('copyLocationMsg');
+    if (!mapEl || !msg) return;
+    const text = 'https://www.google.com/maps?q=' + mapEl.dataset.lat + ',' + mapEl.dataset.lon;
+    const show = (ok) => {
+        msg.textContent = ok ? 'Ubicación copiada. Pégala al repartidor (WhatsApp u otra app).' : 'No se pudo copiar. Enlace: ' + text;
+        msg.style.display = 'block';
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => show(true)).catch(() => show(fallbackCopy(text)));
+    } else {
+        show(fallbackCopy(text));
+    }
+}
+
+function fallbackCopy(text) {
+    const field = document.createElement('textarea');
+    field.value = text;
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
+    field.remove();
+    return copied;
+}
+</script>
 </body>
 </html>
