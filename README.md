@@ -173,6 +173,7 @@ El panel del negocio tiene navbar con módulos:
 - `Sucursales`: puntos de venta activos/inactivos.
 - `Horarios`: días y horas disponibles para recibir pedidos por sucursal.
 - `Personalización`: colores, fondo, fuente y textos de portada por negocio.
+- `WhatsApp`: vinculación del número del negocio para envío de OTP.
 
 URLs locales:
 
@@ -205,7 +206,7 @@ docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQ
 3. Personalizar productos con opciones e indicaciones.
 4. Agregar cantidades; cada pieza se guarda como item separado del carrito.
 5. Checkout con nombre y teléfono.
-6. OTP simulado: `123456`.
+6. OTP enviado por WhatsApp desde el número del negocio (o mostrado en pantalla si `SMS_PROVIDER=log`).
 7. Crear pedido real en estado `nuevo` con folio por negocio, por ejemplo `LB-1001`.
 
 ## Delivery con mapa y zonas por distancia
@@ -294,3 +295,36 @@ docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQ
 El tenant se resuelve desde `HTTP_HOST` para subdominios `*.ordena.garciacore.com` y `*.ordena.localhost`. En local también se acepta `?tenant=slug`.
 
 Todas las consultas de negocio usan el `negocio_id` del contexto actual para evitar lectura o modificación cruzada entre tenants.
+
+## WhatsApp (Evolution API)
+
+La verificación telefónica de clientes se envía por **WhatsApp desde el número del negocio**, usando Evolution API como servidor compartido.
+
+### Activar el servicio
+
+```bash
+cp .env.example .env
+# Llena EVOLUTION_API_URL y EVOLUTION_API_API_KEY
+docker compose --profile whatsapp up -d
+```
+
+Si tu base ya existía, aplica la migración:
+
+```bash
+docker compose exec -T db sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/whatsapp-instances.sql
+```
+
+### Vincular WhatsApp de un negocio
+
+1. Entra al panel admin del negocio: `/admin/whatsapp?tenant=laburgueria`.
+2. Clic en **Vincular WhatsApp**.
+3. Escanea el QR con el celular del negocio (o usa el código de emparejamiento).
+4. Cuando el status cambie a **Conectado**, los clientes recibirán los OTP desde ese número.
+
+### Super Admin
+
+Desde `/superadmin/whatsapp` puedes ver el estado de vinculación de todos los negocios y forzar la desconexión de cualquiera.
+
+### Modo desarrollo local
+
+Si no tienes Evolution API corriendo, define `SMS_PROVIDER=log` en `.env`. El código OTP se mostrará en pantalla al registrarse (sin envío real). No requiere WhatsApp vinculado.

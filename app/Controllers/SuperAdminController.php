@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Models\SuperAdmin;
 use App\Models\SuperAdminBusiness;
+use App\Services\WhatsAppService;
 
 final class SuperAdminController extends Controller
 {
@@ -127,6 +128,42 @@ final class SuperAdminController extends Controller
             : 'No se encontró un admin activo para ese negocio.';
 
         redirect('/superadmin');
+    }
+
+    public function whatsapp(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $wa = new WhatsAppService($this->app);
+        $businesses = $wa->allBusinessesWithWhatsApp();
+
+        $this->view('superadmin/whatsapp', [
+            'businesses' => $businesses,
+            'enabled' => $wa->isEnabled(),
+            'error' => $_SESSION['superadmin_error'] ?? null,
+            'success' => $_SESSION['superadmin_success'] ?? null,
+        ]);
+        unset($_SESSION['superadmin_error'], $_SESSION['superadmin_success']);
+    }
+
+    public function whatsappDisconnect(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = (int) ($_POST['business_id'] ?? 0);
+
+        try {
+            (new WhatsAppService($this->app))->forceDisconnect($businessId);
+            $_SESSION['superadmin_success'] = 'WhatsApp del negocio #' . $businessId . ' desconectado.';
+        } catch (\Throwable $e) {
+            $_SESSION['superadmin_error'] = $e->getMessage();
+        }
+
+        redirect('/superadmin/whatsapp');
     }
 
     private function guard(bool $requireChangedPassword = true): bool

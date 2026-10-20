@@ -54,6 +54,12 @@ $router->get('/admin/branding', [AdminController::class, 'branding']);
 $router->post('/admin/branding', [AdminController::class, 'updateBranding']);
 $router->get('/admin/order', [AdminController::class, 'order']);
 $router->post('/admin/order/status', [AdminController::class, 'status']);
+$router->get('/admin/whatsapp', [AdminController::class, 'whatsapp']);
+$router->post('/admin/whatsapp/connect', [AdminController::class, 'whatsappConnect']);
+$router->get('/admin/whatsapp/status', [AdminController::class, 'whatsappStatus']);
+$router->post('/admin/whatsapp/disconnect', [AdminController::class, 'whatsappDisconnect']);
+$router->post('/admin/whatsapp/test', [AdminController::class, 'whatsappTest']);
+$router->get('/admin/whatsapp/debug', [AdminController::class, 'whatsappDebug']);
 
 $router->get('/superadmin', [SuperAdminController::class, 'dashboard']);
 $router->get('/superadmin/login', [SuperAdminController::class, 'loginForm']);
@@ -63,3 +69,5 @@ $router->get('/superadmin/password', [SuperAdminController::class, 'passwordForm
 $router->post('/superadmin/password', [SuperAdminController::class, 'password']);
 $router->post('/superadmin/businesses', [SuperAdminController::class, 'storeBusiness']);
 $router->post('/superadmin/businesses/reset-admin-password', [SuperAdminController::class, 'resetBusinessAdminPassword']);
+$router->get('/superadmin/whatsapp', [SuperAdminController::class, 'whatsapp']);
+$router->post('/superadmin/whatsapp/disconnect', [SuperAdminController::class, 'whatsappDisconnect']);

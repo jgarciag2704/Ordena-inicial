@@ -13,6 +13,8 @@ use App\Models\DeliveryZone;
 use App\Services\ImageService;
 use App\Services\ThemeResolver;
 use App\Services\TenantResolver;
+use App\Services\WhatsAppService;
+use App\Services\EvolutionApiService;
 
 final class AdminController extends Controller
 {
@@ -615,6 +617,181 @@ final class AdminController extends Controller
         }
 
         redirect('/admin/order?id=' . $orderId . $this->tenantQuery('&'));
+    }
+
+    public function whatsapp(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $business = $this->app->tenant()->get();
+        $wa = new WhatsAppService($this->app);
+
+        $status = $wa->refreshStatus($businessId);
+        $business = $wa->business($businessId);
+
+        $this->view('admin/whatsapp', [
+            'business' => $business,
+            'status' => $status,
+            'enabled' => $wa->isEnabled(),
+            'error' => $_SESSION['admin_whatsapp_error'] ?? null,
+            'success' => $_SESSION['admin_whatsapp_success'] ?? null,
+        ]);
+        unset($_SESSION['admin_whatsapp_error'], $_SESSION['admin_whatsapp_success']);
+    }
+
+    public function whatsappConnect(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $slug = (string) ($this->app->tenant()->get()['slug'] ?? '');
+        $wa = new WhatsAppService($this->app);
+
+        try {
+            $wa->ensureInstance($businessId, $slug);
+            $qrData = $wa->qrCode($businessId);
+            $this->json(['ok' => true, 'qr' => $qrData]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function whatsappPairingCode(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $phoneNumber = trim((string) ($this->input()['phone'] ?? ''));
+        
+        if (!preg_match('/^\d{10,15}$/', $phoneNumber)) {
+            $this->json(['ok' => false, 'error' => 'Número inválido. Incluye código de país sin el símbolo +.'], 422);
+            return;
+        }
+
+        $wa = new WhatsAppService($this->app);
+
+        try {
+            $wa->ensureInstance($businessId, $this->app->tenant()->get()['slug']);
+            $pairingData = $wa->generatePairingCode($businessId, $phoneNumber);
+            $this->json(['ok' => true, 'code' => $pairingData['pairingCode'] ?? null]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function whatsappStatus(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $wa = new WhatsAppService($this->app);
+        $status = $wa->refreshStatus($businessId);
+        $business = $wa->business($businessId);
+
+        $this->json([
+            'ok' => true,
+            'status' => $status,
+            'phone' => $business['whatsapp_instance_phone'] ?? null,
+            'connected_at' => $business['whatsapp_instance_connected_at'] ?? null,
+        ]);
+    }
+
+    public function whatsappDisconnect(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+
+        try {
+            (new WhatsAppService($this->app))->disconnect($businessId);
+            $_SESSION['admin_whatsapp_success'] = 'WhatsApp desconectado.';
+        } catch (\Throwable $e) {
+            $_SESSION['admin_whatsapp_error'] = $e->getMessage();
+        }
+
+        redirect('/admin/whatsapp' . $this->tenantQuery());
+    }
+
+    public function whatsappTest(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $phone = preg_replace('/\D+/', '', (string) ($_POST['telefono'] ?? ''));
+        $business = $this->app->tenant()->get();
+
+        if (!preg_match('/^\d{10}$/', $phone)) {
+            $_SESSION['admin_whatsapp_error'] = 'Ingresa un teléfono de 10 dígitos.';
+            redirect('/admin/whatsapp' . $this->tenantQuery());
+            return;
+        }
+
+        $wa = new WhatsAppService($this->app);
+        $result = $wa->sendOtp($businessId, $phone, '000000', (string) ($business['nombre'] ?? ''));
+
+        if ($result['ok']) {
+            $_SESSION['admin_whatsapp_success'] = 'Mensaje de prueba enviado al ' . $phone . '.';
+        } else {
+            $errorCode = $result['error'] ?? '';
+            if ($errorCode === 'number_not_found') {
+                $_SESSION['admin_whatsapp_error'] = 'El número ' . $phone . ' no está registrado en WhatsApp.';
+            } else {
+                $_SESSION['admin_whatsapp_error'] = 'No se pudo enviar el mensaje de prueba. ' . ($result['message'] ?? '');
+            }
+        }
+
+        redirect('/admin/whatsapp' . $this->tenantQuery());
+    }
+
+    public function whatsappDebug(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        $businessId = $this->app->tenant()->id();
+        $business = $this->app->tenant()->get();
+        
+        $debugInfo = [
+            'business' => [
+                'id' => $businessId,
+                'name' => $business['nombre'] ?? null,
+                'slug' => $business['slug'] ?? null,
+                'whatsapp_instance_name' => $business['whatsapp_instance_name'] ?? null,
+                'whatsapp_instance_token' => isset($business['whatsapp_instance_token']) ? substr($business['whatsapp_instance_token'], 0, 8) . '...' : null,
+                'whatsapp_instance_status' => $business['whatsapp_instance_status'] ?? null,
+                'whatsapp_instance_phone' => $business['whatsapp_instance_phone'] ?? null,
+            ],
+            'evolution_api' => [
+                'enabled' => (new WhatsAppService($this->app))->isEnabled(),
+                'url' => $this->app->config('evolution.url', ''),
+                'api_key' => substr($this->app->config('evolution.api_key', ''), 0, 8) . '...',
+            ],
+            'instances' => [],
+        ];
+
+        try {
+            $api = new EvolutionApiService($this->app);
+            $instances = $api->fetchInstances();
+            $debugInfo['instances'] = $instances;
+        } catch (\Throwable $e) {
+            $debugInfo['instances_error'] = $e->getMessage();
+        }
+
+        $this->json($debugInfo);
     }
 
     private function guard(bool $requireChangedPassword = true): bool

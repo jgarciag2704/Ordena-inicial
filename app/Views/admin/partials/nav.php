@@ -8,6 +8,7 @@
         <a class="nav-link" href="/admin/hours<?= $tenantQuery ?>">Horarios</a>
         <a class="nav-link" href="/admin/delivery-zones<?= $tenantQuery ?>">Zonas</a>
         <a class="nav-link" href="/admin/branding<?= $tenantQuery ?>">Personalización</a>
+        <a class="nav-link" href="/admin/whatsapp<?= $tenantQuery ?>">WhatsApp</a>
     </div>
     <form method="post" action="/admin/logout<?= $tenantQuery ?>">
         <button class="chip">Salir</button>

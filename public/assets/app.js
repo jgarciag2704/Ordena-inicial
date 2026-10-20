@@ -687,7 +687,7 @@ function renderAccount(view, phone) {
     content.innerHTML = `
       ${cerrar}
       <h2>Crear cuenta</h2>
-      <p class="muted">Verificaremos tu número una sola vez con un código por SMS.</p>
+      <p class="muted">Verificaremos tu número una sola vez con un código por WhatsApp.</p>
       <label>Nombre<input id="regName" placeholder="Tu nombre"></label>
       <label>Teléfono<input id="regPhone" inputmode="numeric" maxlength="10" placeholder="Ingresá tu celular a 10 dígitos" oninput="this.value=this.value.replace(/\\D/g,'')"></label>
       <label>Contraseña<input id="regPassword" type="password" placeholder="Mínimo 8 caracteres y una mayúscula"></label>

@@ -69,4 +69,9 @@ return [
         'max_per_hour_ip' => (int) env('OTP_MAX_PER_HOUR_IP', '10'),
         'max_per_minute_business' => (int) env('OTP_MAX_PER_MINUTE_BUSINESS', '20'),
     ],
+    'evolution' => [
+        'url' => rtrim((string) env('EVOLUTION_API_URL', ''), '/'),
+        'api_key' => env('EVOLUTION_API_API_KEY', ''),
+        'timeout' => 20,
+    ],
 ];

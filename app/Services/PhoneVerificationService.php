@@ -50,17 +50,42 @@ final class PhoneVerificationService
         $db = $this->app->db();
         $stmt = $db->prepare('INSERT INTO verificaciones_telefono (negocio_id, telefono, codigo, expira_en) VALUES (?, ?, ?, ?)');
         $stmt->execute([$negocioId, $phone, $code, $expira]);
+        $verificacionId = (int) $db->lastInsertId();
 
-        $sms = new SmsService($this->app);
         $negocioNombre = (string) ($this->app->tenant()->get()['nombre'] ?? '');
-        $sms->send($phone, 'Tu código de verificación para ' . $negocioNombre . ' es: ' . $code . '. No lo compartas.', $negocioNombre);
+        $wa = new WhatsAppService($this->app);
+
+        $canSend = $wa->canSendOtp($negocioId);
+        if (!$canSend['ok']) {
+            return [
+                'ok' => false,
+                'error' => $canSend['message'] ?? 'WhatsApp no vinculado.',
+            ];
+        }
+
+        $sendResult = $wa->sendOtp($negocioId, $phone, $code, $negocioNombre, $verificacionId);
+        if (!$sendResult['ok']) {
+            $errCode = $sendResult['error'] ?? '';
+            if ($errCode === 'whatsapp_rate_limited') {
+                return [
+                    'ok' => false,
+                    'error' => 'Espera unos segundos antes de pedir otro código.',
+                ];
+            }
+            return [
+                'ok' => false,
+                'error' => 'No se pudo enviar el código por WhatsApp. Intenta de nuevo.',
+            ];
+        }
 
         $redis->set($cooldownKey, ['time' => time()], (int) $this->app->config('otp.resend_cooldown_seconds', 60));
 
+        $isDevLog = $this->app->config('sms.provider', 'log') === 'log' && !$wa->isEnabled();
+
         return [
             'ok' => true,
-            'dev_only' => $sms->isDevOnly(),
-            'code' => $sms->isDevOnly() ? $code : null,
+            'dev_only' => $isDevLog,
+            'code' => $isDevLog ? $code : null,
             'expires_in' => $ttlMinutes * 60,
         ];
     }
