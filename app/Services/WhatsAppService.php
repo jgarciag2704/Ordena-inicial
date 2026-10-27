@@ -262,11 +262,11 @@ class WhatsAppService
     private function buildOtpMessage(string $businessName, string $code): string
     {
         $templates = [
-            'Hola 👋 Tu código de verificación para *{business}* es:\n\n*{code}*\n\nNo compartas este código con nadie.',
-            '*{code}* es tu código de verificación de *{business}*.\n\nSi no lo solicitaste, ignora este mensaje.',
-            'Para verificar tu número en *{business}* usa el código:\n\n*{code}*\n\nNunca compartas este código.',
-            'Tu código para *{business}*: *{code}*\n\nVálido por unos minutos. No lo compartas.',
-            '¡Hola! Usa este código para entrar a *{business}*:\n\n*{code}*\n\nNo lo compartas con nadie.',
+            "Hola 👋 Tu código de verificación para *{business}* es:\n\n*{code}*\n\nNo compartas este código con nadie.",
+            "*{code}* es tu código de verificación de *{business}*.\n\nSi no lo solicitaste, ignora este mensaje.",
+            "Para verificar tu número en *{business}* usa el código:\n\n*{code}*\n\nNunca compartas este código.",
+            "Tu código para *{business}*: *{code}*\n\nVálido por unos minutos. No lo compartas.",
+            "¡Hola! Usa este código para entrar a *{business}*:\n\n*{code}*\n\nNo lo compartas con nadie.",
         ];
 
         $template = $templates[array_rand($templates)];
