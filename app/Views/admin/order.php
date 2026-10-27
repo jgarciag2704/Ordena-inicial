@@ -13,7 +13,7 @@
         .order-map {
             height: 240px;
             border-radius: 16px;
-            border: 1px solid #e3e9f2;
+            border: 1px solid color-mix(in srgb, var(--brand) 14%, #e3e9f2);
             overflow: hidden;
             background: #f1f5f9;
         }

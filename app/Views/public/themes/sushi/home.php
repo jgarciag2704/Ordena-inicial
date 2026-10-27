@@ -12,6 +12,8 @@
         <p><?= e($business['hero_subtitulo'] ?? 'Rollos, bowls y entradas en un menu compacto.') ?></p>
     </section>
 
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
+
     <section class="section sushi-layout">
         <aside>
             <h2>Categorias</h2>

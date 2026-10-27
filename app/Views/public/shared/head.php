@@ -3,6 +3,7 @@
 <title>Ordena · <?= e($business['nombre']) ?></title>
 <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(BASE_PATH . '/public/assets/styles.css') ?>">
 <link rel="stylesheet" href="/assets/themes/<?= e($theme) ?>/theme.css?v=<?= filemtime(BASE_PATH . '/public/assets/themes/' . $theme . '/theme.css') ?>">
+<link rel="stylesheet" href="/assets/promo.css?v=<?= filemtime(BASE_PATH . '/public/assets/promo.css') ?>">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
     :root {

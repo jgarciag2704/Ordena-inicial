@@ -15,6 +15,8 @@
         <div class="branches-public" id="branches"></div>
     </section>
 
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
+
     <section class="section mexicana-categories">
         <h2>Elige que se te antoja</h2>
         <div class="chips" id="categories">

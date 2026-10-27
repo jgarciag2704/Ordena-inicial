@@ -15,7 +15,7 @@ final class Menu extends Model
 
     public function products(): array
     {
-        $stmt = $this->db()->prepare('SELECT id, categoria_id, nombre, descripcion, precio, imagen_thumb FROM productos WHERE negocio_id = ? AND disponible = 1 ORDER BY orden, nombre');
+        $stmt = $this->db()->prepare('SELECT id, categoria_id, nombre, descripcion, precio, imagen_thumb, destacado FROM productos WHERE negocio_id = ? AND disponible = 1 ORDER BY destacado DESC, orden, nombre');
         $stmt->execute([$this->negocioId()]);
         $products = $stmt->fetchAll();
 

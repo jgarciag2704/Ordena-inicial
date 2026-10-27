@@ -36,6 +36,8 @@ $router->post('/admin/menu/categories', [AdminController::class, 'storeCategory'
 $router->post('/admin/menu/products', [AdminController::class, 'storeProduct']);
 $router->post('/admin/menu/products/update', [AdminController::class, 'updateProduct']);
 $router->post('/admin/menu/products/toggle', [AdminController::class, 'toggleProduct']);
+$router->post('/admin/menu/products/feature', [AdminController::class, 'toggleFeatured']);
+$router->post('/admin/menu/categories/toggle', [AdminController::class, 'toggleCategory']);
 $router->post('/admin/menu/options', [AdminController::class, 'storeOption']);
 $router->post('/admin/menu/option-values', [AdminController::class, 'storeOptionValue']);
 $router->post('/admin/menu/option-values/update', [AdminController::class, 'updateOptionValue']);

@@ -8,7 +8,7 @@ final class AdminMenu extends Model
 {
     public function categories(): array
     {
-        $stmt = $this->db()->prepare('SELECT * FROM categorias WHERE negocio_id = ? ORDER BY orden, nombre');
+        $stmt = $this->db()->prepare('SELECT c.*, (SELECT COUNT(*) FROM productos p WHERE p.categoria_id = c.id AND p.negocio_id = c.negocio_id AND p.disponible = 1) AS activos FROM categorias c WHERE c.negocio_id = ? ORDER BY c.orden, c.nombre');
         $stmt->execute([$this->negocioId()]);
         return $stmt->fetchAll();
     }
@@ -71,7 +71,7 @@ final class AdminMenu extends Model
             throw new \InvalidArgumentException('La categoría no pertenece a este negocio.');
         }
 
-        $stmt = $this->db()->prepare('INSERT INTO productos (negocio_id, categoria_id, nombre, descripcion, precio, imagen_thumb, disponible, orden) VALUES (?, ?, ?, ?, ?, ?, 1, 100)');
+        $stmt = $this->db()->prepare('INSERT INTO productos (negocio_id, categoria_id, nombre, descripcion, precio, imagen_thumb, disponible, destacado, orden) VALUES (?, ?, ?, ?, ?, ?, 1, ?, 100)');
         $stmt->execute([
             $this->negocioId(),
             $data['categoria_id'],
@@ -79,6 +79,7 @@ final class AdminMenu extends Model
             $data['descripcion'] ?: null,
             $data['precio'],
             $data['imagen_thumb'] ?: null,
+            (int) ($data['destacado'] ?? 0),
         ]);
 
         $productId = (int) $this->db()->lastInsertId();
@@ -108,6 +109,7 @@ final class AdminMenu extends Model
             $data['nombre'],
             $data['descripcion'] ?: null,
             $data['precio'],
+            (int) ($data['destacado'] ?? 0),
         ];
         $imageSql = '';
 
@@ -119,7 +121,7 @@ final class AdminMenu extends Model
         $params[] = $data['id'];
         $params[] = $this->negocioId();
 
-        $stmt = $this->db()->prepare('UPDATE productos SET categoria_id = ?, nombre = ?, descripcion = ?, precio = ?' . $imageSql . ' WHERE id = ? AND negocio_id = ?');
+        $stmt = $this->db()->prepare('UPDATE productos SET categoria_id = ?, nombre = ?, descripcion = ?, precio = ?, destacado = ?' . $imageSql . ' WHERE id = ? AND negocio_id = ?');
         $stmt->execute($params);
     }
 
@@ -131,6 +133,28 @@ final class AdminMenu extends Model
 
         $stmt = $this->db()->prepare('UPDATE productos SET disponible = IF(disponible = 1, 0, 1) WHERE id = ? AND negocio_id = ?');
         $stmt->execute([$id, $this->negocioId()]);
+    }
+
+    public function toggleFeatured(int $id): void
+    {
+        if (!$this->productBelongsToTenant($id)) {
+            throw new \InvalidArgumentException('El producto no pertenece a este negocio.');
+        }
+
+        $stmt = $this->db()->prepare('UPDATE productos SET destacado = IF(destacado = 1, 0, 1) WHERE id = ? AND negocio_id = ?');
+        $stmt->execute([$id, $this->negocioId()]);
+    }
+
+    public function toggleCategory(int $id): void
+    {
+        $stmt = $this->db()->prepare('SELECT COUNT(*) FROM categorias WHERE id = ? AND negocio_id = ?');
+        $stmt->execute([$id, $this->negocioId()]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            throw new \InvalidArgumentException('La categoría no pertenece a este negocio.');
+        }
+
+        $this->db()->prepare('UPDATE categorias SET activo = IF(activo = 1, 0, 1) WHERE id = ? AND negocio_id = ?')
+            ->execute([$id, $this->negocioId()]);
     }
 
     public function createOption(array $data): void

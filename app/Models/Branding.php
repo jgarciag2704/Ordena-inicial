@@ -22,7 +22,7 @@ final class Branding extends Model
 
     public function update(array $data): void
     {
-        $stmt = $this->db()->prepare('UPDATE negocios SET theme_key = ?, color_primario = ?, color_secundario = ?, color_fondo = ?, color_texto = ?, fuente = ?, hero_titulo = ?, hero_subtitulo = ?, comer_aqui_url = ?, fondo_estilo = ?, hero_image_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, hero_image_url) END, hero_overlay_color = ?, hero_overlay_opacity = ?, hero_blur = ? WHERE id = ?');
+        $stmt = $this->db()->prepare('UPDATE negocios SET theme_key = ?, color_primario = ?, color_secundario = ?, color_fondo = ?, color_texto = ?, fuente = ?, hero_titulo = ?, hero_subtitulo = ?, comer_aqui_url = ?, fondo_estilo = ?, hero_image_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, hero_image_url) END, logo_url = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(?, logo_url) END, hero_overlay_color = ?, hero_overlay_opacity = ?, hero_blur = ? WHERE id = ?');
         $stmt->execute([
             $data['theme_key'],
             $data['color_primario'],
@@ -36,6 +36,8 @@ final class Branding extends Model
             $data['fondo_estilo'],
             $data['remove_hero_image'] ? 1 : 0,
             $data['hero_image_url'],
+            $data['remove_logo'] ? 1 : 0,
+            $data['logo_url'],
             $data['hero_overlay_color'],
             $data['hero_overlay_opacity'],
             $data['hero_blur'],

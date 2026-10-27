@@ -23,6 +23,8 @@
         </aside>
     </section>
 
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
+
     <section class="section">
         <h2>Sucursales</h2>
         <div class="branches-public" id="branches"></div>

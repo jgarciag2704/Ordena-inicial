@@ -19,6 +19,8 @@
         </div>
     </section>
 
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
+
     <section class="cafe-gallery">
         <article><span>01</span><b>Postres suaves</b><small>Porciones listas para acompanar tu bebida.</small></article>
         <article><span>02</span><b>Cafe caliente</b><small>Opciones preparadas al momento.</small></article>

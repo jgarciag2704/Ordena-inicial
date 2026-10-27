@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Ordena · <?= e($business['nombre']) ?></title>
     <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/promo.css?v=<?= filemtime(BASE_PATH . '/public/assets/promo.css') ?>">
     <style>
         :root {
             --brand: <?= e($business['color_primario'] ?? '#cc4b25') ?>;
@@ -33,6 +34,8 @@
             <a class="primary hero-cta" href="<?= e($business['comer_aqui_url']) ?>" target="_blank" rel="noopener">Comer aquí</a>
         <?php endif; ?>
     </section>
+
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
 
     <section class="section">
         <h2>Menú</h2>

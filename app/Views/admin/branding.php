@@ -53,6 +53,19 @@
                 </select>
             </label>
 
+            <label>Logo del negocio<input name="logo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+            <p class="muted">Se muestra en el navbar del panel. Recomendado: PNG o WebP con fondo transparente, máximo 480 x 240 px.</p>
+            <?php if (!empty($business['logo_url'])): ?>
+                <div class="hero-image-admin">
+                    <img src="<?= e($business['logo_url']) ?>" alt="Logo actual" style="max-width:160px;max-height:70px;object-fit:contain;background:transparent;">
+                    <div>
+                        <b>Logo actual cargado</b>
+                        <small>Si subes otro logo, reemplazará este.</small>
+                    </div>
+                    <button class="danger-button" name="remove_logo" value="1" type="submit" formnovalidate>Eliminar logo</button>
+                </div>
+            <?php endif; ?>
+
             <label>Fondo inicial / portada<input name="hero_image" type="file" accept="image/jpeg,image/png,image/webp"></label>
             <p class="muted">Recomendado: 2400 x 1350 px, formato horizontal 16:9, JPG/PNG/WebP hasta 5 MB. Mantén texto, logos o comida principal al centro para que se vea bien en móvil y desktop.</p>
             <?php if (!empty($business['hero_image_url'])): ?>

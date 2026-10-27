@@ -109,12 +109,12 @@ final class AdminController extends Controller
         $name = trim((string) ($_POST['nombre'] ?? ''));
         if ($name === '') {
             $_SESSION['admin_menu_error'] = 'Escribe el nombre de la categoría.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         (new AdminMenu($this->app))->createCategory($name);
         $_SESSION['admin_menu_success'] = 'Categoría guardada.';
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function storeProduct(): void
@@ -128,12 +128,13 @@ final class AdminController extends Controller
             'nombre' => trim((string) ($_POST['nombre'] ?? '')),
             'descripcion' => trim((string) ($_POST['descripcion'] ?? '')),
             'precio' => (float) ($_POST['precio'] ?? 0),
+            'destacado' => isset($_POST['destacado']) ? 1 : 0,
             'imagen_thumb' => null,
         ];
 
         if ($data['categoria_id'] <= 0 || $data['nombre'] === '' || $data['precio'] <= 0) {
             $_SESSION['admin_menu_error'] = 'Selecciona categoría, nombre y precio válido.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         try {
@@ -144,7 +145,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function updateProduct(): void
@@ -159,12 +160,13 @@ final class AdminController extends Controller
             'nombre' => trim((string) ($_POST['nombre'] ?? '')),
             'descripcion' => trim((string) ($_POST['descripcion'] ?? '')),
             'precio' => (float) ($_POST['precio'] ?? 0),
+            'destacado' => isset($_POST['destacado']) ? 1 : 0,
             'imagen_thumb' => null,
         ];
 
         if ($data['id'] <= 0 || $data['categoria_id'] <= 0 || $data['nombre'] === '' || $data['precio'] <= 0) {
             $_SESSION['admin_menu_error'] = 'Revisa categoría, nombre y precio del producto.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         try {
@@ -175,7 +177,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function toggleProduct(): void
@@ -186,12 +188,81 @@ final class AdminController extends Controller
 
         try {
             (new AdminMenu($this->app))->toggleProduct((int) ($_POST['id'] ?? 0));
-            $_SESSION['admin_menu_success'] = 'Disponibilidad actualizada.';
+            $message = 'Disponibilidad actualizada.';
+            $ok = true;
         } catch (\Throwable $exception) {
-            $_SESSION['admin_menu_error'] = $exception->getMessage();
+            $message = $exception->getMessage();
+            $ok = false;
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        $this->menuFeedback($ok, $message);
+    }
+
+    public function toggleFeatured(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        try {
+            (new AdminMenu($this->app))->toggleFeatured((int) ($_POST['id'] ?? 0));
+            $message = 'Promoción actualizada.';
+            $ok = true;
+        } catch (\Throwable $exception) {
+            $message = $exception->getMessage();
+            $ok = false;
+        }
+
+        $this->menuFeedback($ok, $message);
+    }
+
+    public function toggleCategory(): void
+    {
+        if (!$this->guard()) {
+            return;
+        }
+
+        try {
+            (new AdminMenu($this->app))->toggleCategory((int) ($_POST['id'] ?? 0));
+            $message = 'Categoría actualizada.';
+            $ok = true;
+        } catch (\Throwable $exception) {
+            $message = $exception->getMessage();
+            $ok = false;
+        }
+
+        $this->menuFeedback($ok, $message);
+    }
+
+    private function menuFeedback(bool $ok, string $message): void
+    {
+        if (($_POST['ajax'] ?? '') === '1') {
+            $product = null;
+            if ($ok && isset($_POST['id'])) {
+                $stmt = $this->app->db()->prepare('SELECT disponible, destacado FROM productos WHERE id = ? AND negocio_id = ?');
+                $stmt->execute([(int) $_POST['id'], $this->app->tenant()->id()]);
+                $product = $stmt->fetch() ?: null;
+            }
+            $this->json(['ok' => $ok, 'message' => $message, 'product' => $product]);
+            return;
+        }
+
+        $_SESSION[$ok ? 'admin_menu_success' : 'admin_menu_error'] = $message;
+        redirect('/admin/menu' . $this->menuQuery());
+    }
+
+    private function menuQuery(): string
+    {
+        $query = [];
+        if (isset($_GET['tenant'])) {
+            $query['tenant'] = (string) $_GET['tenant'];
+        }
+        $edit = (int) ($_POST['editar'] ?? 0);
+        if ($edit > 0) {
+            $query['editar'] = $edit;
+        }
+
+        return $query ? '?' . http_build_query($query) : '';
     }
 
     public function storeOption(): void
@@ -210,7 +281,7 @@ final class AdminController extends Controller
 
         if ($data['producto_id'] <= 0 || $data['nombre'] === '') {
             $_SESSION['admin_menu_error'] = 'Selecciona producto y escribe el nombre del grupo.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         try {
@@ -220,7 +291,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function storeOptionValue(): void
@@ -237,7 +308,7 @@ final class AdminController extends Controller
 
         if ($data['producto_opcion_id'] <= 0 || $data['nombre'] === '' || $data['precio_extra'] < 0) {
             $_SESSION['admin_menu_error'] = 'Selecciona grupo, nombre del extra y precio válido.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         try {
@@ -247,7 +318,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function updateOptionValue(): void
@@ -264,7 +335,7 @@ final class AdminController extends Controller
 
         if ($data['id'] <= 0 || $data['nombre'] === '' || $data['precio_extra'] < 0) {
             $_SESSION['admin_menu_error'] = 'Revisa nombre y precio del extra.';
-            redirect('/admin/menu' . $this->tenantQuery());
+            redirect('/admin/menu' . $this->menuQuery());
         }
 
         try {
@@ -274,7 +345,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function deleteOptionValue(): void
@@ -290,7 +361,7 @@ final class AdminController extends Controller
             $_SESSION['admin_menu_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/menu' . $this->tenantQuery());
+        redirect('/admin/menu' . $this->menuQuery());
     }
 
     public function branches(): void
@@ -319,12 +390,12 @@ final class AdminController extends Controller
         $data = $this->branchData();
         if ($data['nombre'] === '' || $data['direccion'] === '') {
             $_SESSION['admin_settings_error'] = 'Nombre y dirección son obligatorios.';
-            redirect('/admin/branches' . $this->tenantQuery());
+            redirect('/admin/branches' . $this->branchesReturnQuery(['nuevo' => '1']));
         }
 
         (new AdminSettings($this->app))->createBranch($data);
         $_SESSION['admin_settings_success'] = 'Sucursal creada.';
-        redirect('/admin/branches' . $this->tenantQuery());
+        redirect('/admin/branches' . $this->branchesReturnQuery());
     }
 
     public function updateBranch(): void
@@ -337,12 +408,12 @@ final class AdminController extends Controller
         $data['id'] = (int) ($_POST['id'] ?? 0);
         if ($data['id'] <= 0 || $data['nombre'] === '' || $data['direccion'] === '') {
             $_SESSION['admin_settings_error'] = 'Revisa la sucursal seleccionada.';
-            redirect('/admin/branches' . $this->tenantQuery());
+            redirect('/admin/branches' . $this->branchesReturnQuery(['editar' => '']));
         }
 
         (new AdminSettings($this->app))->updateBranch($data);
         $_SESSION['admin_settings_success'] = 'Sucursal actualizada.';
-        redirect('/admin/branches' . $this->tenantQuery());
+        redirect('/admin/branches' . $this->branchesReturnQuery());
     }
 
     public function toggleBranch(): void
@@ -351,9 +422,46 @@ final class AdminController extends Controller
             return;
         }
 
-        (new AdminSettings($this->app))->toggleBranch((int) ($_POST['id'] ?? 0));
-        $_SESSION['admin_settings_success'] = 'Disponibilidad de sucursal actualizada.';
+        $settings = new AdminSettings($this->app);
+        $id = (int) ($_POST['id'] ?? 0);
+        if (!$settings->branchBelongsToTenant($id)) {
+            $message = 'La sucursal no pertenece a este negocio.';
+            $ok = false;
+        } else {
+            $settings->toggleBranch($id);
+            $message = 'Disponibilidad de sucursal actualizada.';
+            $ok = true;
+        }
+
+        if (($_POST['ajax'] ?? '') === '1') {
+            $branch = null;
+            if ($ok) {
+                $stmt = $this->app->db()->prepare('SELECT id, activa FROM sucursales WHERE id = ? AND negocio_id = ?');
+                $stmt->execute([$id, $this->app->tenant()->id()]);
+                $branch = $stmt->fetch() ?: null;
+            }
+            $this->json(['ok' => $ok, 'message' => $message, 'branch' => $branch]);
+            return;
+        }
+
+        $_SESSION[$ok ? 'admin_settings_success' : 'admin_settings_error'] = $message;
         redirect('/admin/branches' . $this->tenantQuery());
+    }
+
+    private function branchesReturnQuery(array $extra = []): string
+    {
+        $query = [];
+        if (isset($_GET['tenant'])) {
+            $query['tenant'] = (string) $_GET['tenant'];
+        }
+        if (isset($extra['nuevo'])) {
+            $query['nuevo'] = '1';
+        }
+        if (isset($extra['editar']) && (int) ($_POST['id'] ?? 0) > 0) {
+            $query['editar'] = (int) ($_POST['id'] ?? 0);
+        }
+
+        return $query ? '?' . http_build_query($query) : '';
     }
 
     public function hours(): void
@@ -443,7 +551,7 @@ final class AdminController extends Controller
         $data = $this->deliveryZoneData();
         if ($data['nombre'] === '' || $data['sucursal_id'] <= 0 || $data['costo_envio'] < 0) {
             $_SESSION['admin_zones_error'] = 'Escribe nombre, selecciona sucursal y indica un costo de envío válido.';
-            redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+            redirect('/admin/delivery-zones' . $this->zonesQuery($data['sucursal_id'], 'nueva'));
         }
 
         try {
@@ -453,7 +561,7 @@ final class AdminController extends Controller
             $_SESSION['admin_zones_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+        redirect('/admin/delivery-zones' . $this->zonesQuery($data['sucursal_id']));
     }
 
     public function updateDeliveryZone(): void
@@ -466,7 +574,7 @@ final class AdminController extends Controller
         $data['id'] = (int) ($_POST['id'] ?? 0);
         if ($data['id'] <= 0 || $data['nombre'] === '' || $data['sucursal_id'] <= 0 || $data['costo_envio'] < 0) {
             $_SESSION['admin_zones_error'] = 'Revisa nombre, sucursal y costo de envío.';
-            redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+            redirect('/admin/delivery-zones' . $this->zonesQuery($data['sucursal_id'], 'editar', $data['id']));
         }
 
         try {
@@ -476,7 +584,7 @@ final class AdminController extends Controller
             $_SESSION['admin_zones_error'] = $exception->getMessage();
         }
 
-        redirect('/admin/delivery-zones' . $this->branchQuery($data['sucursal_id']));
+        redirect('/admin/delivery-zones' . $this->zonesQuery($data['sucursal_id']));
     }
 
     public function toggleDeliveryZone(): void
@@ -485,15 +593,51 @@ final class AdminController extends Controller
             return;
         }
 
+        $zone = new DeliveryZone($this->app);
         $branchId = (int) ($_POST['sucursal_id'] ?? 0);
+        $id = (int) ($_POST['id'] ?? 0);
+
+        $ok = true;
         try {
-            (new DeliveryZone($this->app))->toggle((int) ($_POST['id'] ?? 0));
-            $_SESSION['admin_zones_success'] = 'Disponibilidad de zona actualizada.';
+            $zone->toggle($id);
+            $message = 'Disponibilidad de zona actualizada.';
         } catch (\Throwable $exception) {
-            $_SESSION['admin_zones_error'] = $exception->getMessage();
+            $message = $exception->getMessage();
+            $ok = false;
         }
 
+        if (($_POST['ajax'] ?? '') === '1') {
+            $data = null;
+            if ($ok) {
+                $stmt = $this->app->db()->prepare('SELECT id, activa FROM zonas_entrega WHERE id = ? AND negocio_id = ?');
+                $stmt->execute([$id, $this->app->tenant()->id()]);
+                $data = $stmt->fetch() ?: null;
+            }
+            $this->json(['ok' => $ok, 'message' => $message, 'zone' => $data]);
+            return;
+        }
+
+        $_SESSION[$ok ? 'admin_zones_success' : 'admin_zones_error'] = $message;
         redirect('/admin/delivery-zones' . $this->branchQuery($branchId));
+    }
+
+    private function zonesQuery(int $branchId, string $mode = '', int $zoneId = 0): string
+    {
+        $query = [];
+        if (isset($_GET['tenant'])) {
+            $query['tenant'] = (string) $_GET['tenant'];
+        }
+        if ($branchId > 0) {
+            $query['branch_id'] = $branchId;
+        }
+        if ($mode === 'nueva' || $mode === 'editar') {
+            $query['modo'] = $mode;
+            if ($mode === 'editar' && $zoneId > 0) {
+                $query['editar'] = $zoneId;
+            }
+        }
+
+        return $query ? '?' . http_build_query($query) : '';
     }
 
     public function branding(): void
@@ -532,6 +676,8 @@ final class AdminController extends Controller
             'fondo_estilo' => (string) ($_POST['fondo_estilo'] ?? 'calido'),
             'hero_image_url' => null,
             'remove_hero_image' => isset($_POST['remove_hero_image']),
+            'logo_url' => null,
+            'remove_logo' => isset($_POST['remove_logo']),
             'hero_overlay_color' => (string) ($_POST['hero_overlay_color'] ?? '#000000'),
             'hero_overlay_opacity' => (float) ($_POST['hero_overlay_opacity'] ?? 0.35),
             'hero_blur' => (int) ($_POST['hero_blur'] ?? 0),
@@ -544,6 +690,7 @@ final class AdminController extends Controller
 
         try {
             $data['hero_image_url'] = (new ImageService())->heroBackground($_FILES['hero_image'] ?? [], $this->app->tenant()->id());
+            $data['logo_url'] = (new ImageService())->logo($_FILES['logo'] ?? [], $this->app->tenant()->id());
             (new Branding($this->app))->update($data);
         } catch (\Throwable $exception) {
             $_SESSION['admin_branding_error'] = $exception->getMessage();
@@ -632,10 +779,21 @@ final class AdminController extends Controller
         $status = $wa->refreshStatus($businessId);
         $business = $wa->business($businessId);
 
+        $db = $this->app->db();
+        $stmt = $db->prepare('SELECT para, texto, status, respuesta, created_at FROM whatsapp_envios WHERE negocio_id = ? ORDER BY created_at DESC LIMIT 15');
+        $stmt->execute([$businessId]);
+        $envios = $stmt->fetchAll();
+
+        $stmt = $db->prepare('SELECT COUNT(*) total, COALESCE(SUM(status = "enviado"), 0) enviados, COALESCE(SUM(created_at >= CURDATE()), 0) hoy FROM whatsapp_envios WHERE negocio_id = ?');
+        $stmt->execute([$businessId]);
+        $stats = $stmt->fetch() ?: ['total' => 0, 'enviados' => 0, 'hoy' => 0];
+
         $this->view('admin/whatsapp', [
             'business' => $business,
             'status' => $status,
             'enabled' => $wa->isEnabled(),
+            'envios' => $envios,
+            'stats' => $stats,
             'error' => $_SESSION['admin_whatsapp_error'] ?? null,
             'success' => $_SESSION['admin_whatsapp_success'] ?? null,
         ]);

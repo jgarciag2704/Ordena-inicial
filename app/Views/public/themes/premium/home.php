@@ -16,6 +16,8 @@
         <?php endif; ?>
     </section>
 
+    <?php require BASE_PATH . '/app/Views/public/shared/promos.php'; ?>
+
     <section class="premium-experience">
         <article>Ingredientes seleccionados</article><article>Servicio cuidado</article><article>Pedido directo</article>
     </section>
